@@ -3,7 +3,7 @@ src_dir := "src"
 examples_dir := "examples"
 tests_dir := "tests"
 
-default: clean build format bundle minify
+default: clean build format bundle
 
 @format:
     stylua {{build_dir}}/*.lua
@@ -12,10 +12,7 @@ default: clean build format bundle minify
     lua scripts/create-executable.lua
 
 bundle:
-    darklua process {{build_dir}}/main.lua {{build_dir}}/luatask.lua
-
-minify:
-    darklua minify {{build_dir}}/luatask.lua {{build_dir}}/luatask-min.lua
+    darklua -vv process {{build_dir}}/main.lua {{build_dir}}/luatask.lua
 
 @build:
     cyan build
@@ -24,7 +21,7 @@ minify:
     cyan check
 
 @clean:
-    -rip {{build_dir}}
+    rip {{build_dir}}
 
 # Run type checker on specific files
 @check-file FILE:

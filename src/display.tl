@@ -7,8 +7,6 @@ local Colors = require('colors')
 local record Display
 end
 
-
-
 -- Get status symbol for a task
 local function get_status_symbol(status: string): string
     if status == "success" then
@@ -41,9 +39,7 @@ function Display.show_execution_tree(executions: {Types.TaskExecution}, show_all
         return
     end
 
-    print("")
-    print("Execution tree:")
-    print("")
+    print("Tasks:")
 
     -- For simple sequential execution, just show as a flat list with tree symbols
     -- This matches the expected output format better than trying to build complex trees

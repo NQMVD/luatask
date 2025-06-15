@@ -1,0 +1,16 @@
+{
+  "bundle": {
+    "require_mode": {
+      "name": "path",
+      "sources": {
+        "types": "./build/types.lua",
+        "parser": "./build/parser.lua",
+        "runner": "./build/runner.lua",
+        "logger": "./build/logger.lua",
+        "result": "./build/result.lua",
+        "colors": "./build/colors.lua",
+        "display": "./build/display.lua"
+      }
+    }
+  }
+}

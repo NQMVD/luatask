@@ -1,11 +1,11 @@
 -- Main entry point for LuaTask
 -- Handles CLI parsing, task loading, and execution coordination
 
-local Types = require('types')
-local Parser = require('parser')
-local Runner = require('runner')
-local LoggerModule = require('logger')
-local Display = require('display')
+local Types         = require('types')
+local Parser        = require('parser')
+local Runner        = require('runner')
+local LoggerModule  = require('logger')
+local Display       = require('display')
 
 -- Global log object for tasks
 global log: {string: function(string)}

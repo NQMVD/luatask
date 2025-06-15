@@ -1,60 +1,61 @@
 #!/usr/bin/env lua
--- Post-build script to create the main LuaTask executable
--- This script is called by Cyan after building the Teal sources
 
-local function create_executable()
-  local build_dir = "build"
-  local executable_path = build_dir .. "/luatask"
-
-  -- Get absolute path to build directory for package.path
-  local pwd = os.getenv("PWD") or "."
-  local abs_build_dir = pwd .. "/" .. build_dir
-
-  -- Create the executable script content
-  local executable_content = [[#!/usr/bin/env lua
--- LuaTask - Lua-based Task Runner
--- Generated executable script
-
--- Set up module path to find compiled Lua files
-local script_path = debug.getinfo(1, "S").source:match("@(.*)")
-if script_path then
-    local script_dir = script_path:match("(.*/)")
-    if script_dir then
-        package.path = script_dir .. "?.lua;" .. package.path
-    end
+local function read_file(filename)
+  local file = io.open(filename, "r")
+  if not file then
+    error("Could not open file: " .. filename)
+  end
+  local content = file:read("*all")
+  file:close()
+  return content
 end
 
--- Load and run the main module
-local Main = require("main")
+local function write_file(filename, content)
+  local file = io.open(filename, "w")
+  if not file then
+    error("Could not create file: " .. filename)
+  end
+  file:write(content)
+  file:close()
+end
+
+local function create_executable()
+  print("Creating standalone executable...")
+
+  -- Read the minified bundled Lua code
+  local lua_code = read_file("dist/luatask-minified.lua")
+
+  -- Create executable script with shebang
+  local executable_content = [[#!/usr/bin/env lua
+-- LuaTask Standalone Executable
+-- Generated from Teal sources via darklua processing and minification
+
+]] .. lua_code .. [[
+
+-- Entry point - call main with command line arguments
 if Main and Main.main then
-    Main.main(arg)
+    Main.main(arg or {})
 else
-    print("Error: Could not load main module")
+    print("Error: Main module not found or main function not available")
     os.exit(1)
 end
 ]]
 
-  -- Write the executable file
-  local file = io.open(executable_path, "w")
-  if not file then
-    print("Error: Could not create executable at " .. executable_path)
-    os.exit(1)
-  end
+  -- Write executable file
+  write_file("dist/luatask", executable_content)
 
-  file:write(executable_content)
-  file:close()
+  -- Make executable (Unix/Linux/macOS)
+  os.execute("chmod +x dist/luatask")
 
-  -- Make it executable
-  local chmod_cmd = "chmod +x " .. executable_path
-  local success = os.execute(chmod_cmd)
-
-  if success == 0 or success == true then
-    print("Created executable: " .. executable_path)
-  else
-    print("Warning: Could not make " .. executable_path .. " executable")
-    print("Run: chmod +x " .. executable_path)
-  end
+  print("Executable created: dist/luatask")
+  print("File size: " .. string.format("%.2f KB",
+    (io.open("dist/luatask", "r"):seek("end") or 0) / 1024))
 end
 
--- Run the script
+-- Ensure dist directory exists
+os.execute("mkdir -p dist")
+
+-- Create the executable
 create_executable()
+
+print("Done! You can now test with: ./dist/luatask --help")
