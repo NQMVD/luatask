@@ -10,7 +10,8 @@
         "result": "./build/result.lua",
         "colors": "./build/colors.lua",
         "display": "./build/display.lua"
-      }
+      },
+      "use_luau_configuration": false
     }
   }
 }

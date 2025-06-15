@@ -1,0 +1,271 @@
+#!/usr/bin/env lua
+-- LuaTask Standalone Executable
+-- Generated from Teal sources via darklua processing and minification
+
+local a a={cache={},load=function(b)if not a.cache[b]then a.cache[b]={c=a[b]()}
+end return a.cache[b].c end}do function a.a()local b={}return b end function a.b
+()a.load'a'local b={}local function parse_dependency(c)if type(c)=='string'then
+return{name=c,args={}}elseif type(c)=='table'then local d=c local e={name=d[1],
+args={}}for f=2,#d do table.insert(e.args,tostring(d[f]))end return e else error
+'Invalid dependency format: must be string or table'end end local function
+validate_argument_spec(c,d)if type(d)~='table'then error("Argument spec for '"..
+c.."' must be a table")end local e=d local f={required=false,type='string',
+default=nil}if e.required~=nil then if type(e.required)~='boolean'then error(
+"Argument spec '"..c.."': required must be boolean")end f.required=e.required
+end if e.type~=nil then if type(e.type)~='string'then error("Argument spec '"..c
+.."': type must be string")end f.type=e.type end if e.default~=nil then f.
+default=e.default end return f end local function parse_task(c,d)if type(d)~=
+'table'then error("Task '"..c.."' must be a table")end local e=d if type(e.
+description)~='string'then error("Task '"..c.."': description must be a string")
+end if type(e.run)~='function'then error("Task '"..c..
+"': run must be a function")end local f={description=e.description,group='',
+dependencies={},arguments={},run=e.run}if e.group~=nil then if type(e.group)~=
+'string'then error("Task '"..c.."': group must be a string")end f.group=e.group
+end if e.dependencies~=nil then if type(e.dependencies)~='table'then error(
+"Task '"..c.."': dependencies must be a table")end local g=e.dependencies for h,
+i in ipairs(g)do local j,k=pcall(parse_dependency,i)if not j then error("Task '"
+..c.."': invalid dependency at index "..tostring(h)..': '..tostring(k))end table
+.insert(f.dependencies,k)end end if e.arguments~=nil then if type(e.arguments)~=
+'table'then error("Task '"..c.."': arguments must be a table")end local g=e.
+arguments for h,i in pairs(g)do if type(h)~='string'then error("Task '"..c..
+"': argument names must be strings")end local j,k=pcall(validate_argument_spec,h
+,i)if not j then error("Task '"..c.."': "..tostring(k))end f.arguments[h]=k end
+end return f end function b.load_task_file(c)local d=io.open(c,'r')if not d then
+error('Task file not found: '..c)end d:close()local e,f=loadfile(c)if not e then
+error('Failed to load task file: '..(f or'unknown error'))end local g,h=pcall(e)
+if not g then error('Failed to execute task file: '..tostring(h))end if type(h)
+~='table'then error'Task file must return a table of tasks'end local i={tasks={}
+,file_path=c}local j=h for k,l in pairs(j)do if type(k)~='string'then error
+'Task names must be strings'end local m,n=pcall(parse_task,k,l)if not m then
+error("Failed to parse task '"..k.."': "..tostring(n))end i.tasks[k]=n end
+return i end function b.validate_dependencies(c)for d,e in pairs(c.tasks)do for
+f,g in ipairs(e.dependencies)do if not c.tasks[g.name]then return false,"Task '"
+..d.."' depends on unknown task '"..g.name.."'"end end end return true,''end
+local function has_circular_dependency(c,d,e,f)if f[d]then return true,
+"Circular dependency detected involving task '"..d.."'"end if e[d]then return
+false,''end e[d]=true f[d]=true local g=c.tasks[d]if g then for h,i in ipairs(g.
+dependencies)do local j,k=has_circular_dependency(c,i.name,e,f)if j then return
+true,k end end end f[d]=false return false,''end function b.validate_no_cycles(c
+)local d={}local e={}for f,g in pairs(c.tasks)do if not d[f]then local h,i=
+has_circular_dependency(c,f,d,e)if h then return false,i end end end return true
+,''end function b.parse_file(c)local d=b.load_task_file(c)local e,f=b.
+validate_dependencies(d)if not e then error(f)end local g,h=b.
+validate_no_cycles(d)if not g then error(h)end return d end return b end
+function a.c()local b={}b.SUCCESS='SUCCESS'b.FAIL='FAIL'function b.is_success(c)
+return c==b.SUCCESS end function b.is_fail(c)return c==b.FAIL end function b.
+is_valid(c)return c==b.SUCCESS or c==b.FAIL end return b end function a.d()a.
+load'a'local b={DEBUG=0,INFO=1,WARN=2,ERROR=3}local c={}local function
+add_message(d,e,f)local g=e local h=b[g]or 0 if h<d.min_level then return end
+local i={level=e,message=f,timestamp=os.time()}if d.current_task~=''then if not
+d.messages[d.current_task]then d.messages[d.current_task]={}end table.insert(d.
+messages[d.current_task],i)end end local function set_current_task(d,e)d.
+current_task=e if not d.messages[e]then d.messages[e]={}end end local function
+debug_log(d,e)add_message(d,'DEBUG',e)end local function info_log(d,e)
+add_message(d,'INFO',e)end local function warn_log(d,e)add_message(d,'WARN',e)
+end local function error_log(d,e)add_message(d,'ERROR',e)end local function
+new_logger(d,e)local f=d:upper()local g=b[f]or b.INFO return{current_task='',
+min_level=g,messages={},show_colors=e}end local d=new_logger('INFO',true)local e
+={debug=function(e)debug_log(d,e)end,info=function(e)info_log(d,e)end,warn=
+function(e)warn_log(d,e)end,error=function(e)error_log(d,e)end}local function
+set_global_task(f)set_current_task(d,f)end local function set_global_level(f)
+local g=f:upper()d.min_level=b[g]or b.INFO end local function get_global_logger(
+)return d end local function get_log_object()return e end return{Logger=c,
+new_logger=new_logger,set_global_task=set_global_task,set_global_level=
+set_global_level,get_global_logger=get_global_logger,get_log_object=
+get_log_object}end function a.e()a.load'a'local b=a.load'c'local c=a.load'd'
+local function manual_unpack(d)if#d==0 then return end if#d==1 then return d[1]
+end if#d==2 then return d[1],d[2]end if#d==3 then return d[1],d[2],d[3]end if#d
+==4 then return d[1],d[2],d[3],d[4]end if#d==5 then return d[1],d[2],d[3],d[4],d
+[5]end return d[1],d[2],d[3],d[4],d[5]end local d={}local function
+create_execution(e,f,g)return{name=e,args=f,status='pending',dependencies=g,
+coroutine=nil,start_time=0,end_time=0,task_result={success=false,result=b.FAIL,
+values={},error=''},log_messages={}}end local function resolve_dependencies(e,f,
+g,h,i)for j,k in ipairs(i)do if k==f then error('Circular dependency detected: '
+..table.concat(i,' -> ')..' -> '..f)end end local j={}for k,l in ipairs(i)do
+table.insert(j,l)end table.insert(j,f)local k={}local l=e.tasks[f]if not l then
+error('Task not found: '..f)end for m,n in ipairs(l.dependencies)do local o=n.
+name..'('..table.concat(n.args,',')..')'if not h[o]then h[o]=true local p=
+resolve_dependencies(e,n.name,n.args,h,j)for q,r in ipairs(p)do table.insert(k,r
+)end end end local m=create_execution(f,g,l.dependencies)table.insert(k,m)return
+k end local function execute_task(e,f)local g=e.tasks[f.name]if not g then
+return{success=false,result=b.FAIL,values={},error='Task not found: '..f.name}
+end c.set_global_task(f.name)local h=c.get_global_logger()h.messages[f.name]={}
+log=c.get_log_object()local i={}if g.arguments then for j,k in ipairs(f.args)do
+if k=='true'then i[j]=true elseif k=='false'then i[j]=false else local l=
+tonumber(k)if l then i[j]=l else i[j]=k end end end else for j,k in ipairs(f.
+args)do i[j]=k end end local j={pcall(g.run,manual_unpack(i))}local k=j[1]local
+l=j[2]if not k then return{success=false,result=b.FAIL,values={},error=tostring(
+l)or'Unknown error'}end if not b.is_valid(tostring(l))then return{success=false,
+result=b.FAIL,values={},error='Task returned invalid result: '..tostring(l)}end
+local m={}for n=3,#j do m[n-2]=j[n]end return{success=true,result=tostring(l),
+values=m,error=''}end function d.parse_task_spec(e)local f={}for g in e:gmatch
+'%S+'do table.insert(f,g)end if#f==0 then error'Empty task specification'end
+local g=f[1]local h={}for i=2,#f do table.insert(h,f[i])end return g,h end
+function d.run_tasks(e,f)local g={}local h={}for i,j in ipairs(f)do local k,l=d.
+parse_task_spec(j)local m=resolve_dependencies(e,k,l,h,{})for n,o in ipairs(m)do
+table.insert(g,o)end end for i,j in ipairs(g)do j.status='running'j.start_time=
+os.time()j.task_result=execute_task(e,j)j.end_time=os.time()local k=c.
+get_global_logger()if k.messages[j.name]then j.log_messages=k.messages[j.name]
+end if j.task_result.success and b.is_success(j.task_result.result)then j.status
+='success'elseif j.task_result.success and b.is_fail(j.task_result.result)then j
+.status='fail'else j.status='error'end if j.status=='fail'or j.status=='error'
+then break end end return g end function d.get_stats(e)local f={total=#e,success
+=0,fail=0,error=0,pending=0,running=0}for g,h in ipairs(e)do local i=h.status if
+f[i]then f[i]=f[i]+1 end end return f end function d.all_successful(e)for f,g in
+ipairs(e)do if g.status~='success'then return false end end return true end
+return d end function a.f()local b={}local c={rosewater='\27[38;2;245;224;220m',
+flamingo='\27[38;2;242;205;205m',pink='\27[38;2;245;194;231m',mauve=
+'\27[38;2;203;166;247m',red='\27[38;2;243;139;168m',maroon=
+'\27[38;2;235;160;172m',peach='\27[38;2;250;179;135m',yellow=
+'\27[38;2;249;226;175m',green='\27[38;2;166;227;161m',teal=
+'\27[38;2;148;226;213m',sky='\27[38;2;137;220;235m',sapphire=
+'\27[38;2;116;199;236m',blue='\27[38;2;137;180;250m',lavender=
+'\27[38;2;180;190;254m',text='\27[38;2;205;214;244m',subtext1=
+'\27[38;2;186;194;222m',subtext0='\27[38;2;166;173;200m',overlay2=
+'\27[38;2;147;153;178m',overlay1='\27[38;2;127;132;156m',overlay0=
+'\27[38;2;108;112;134m',surface2='\27[38;2;88;91;112m',surface1=
+'\27[38;2;69;71;90m',surface0='\27[38;2;49;50;68m',base='\27[38;2;30;30;46m',
+mantle='\27[38;2;24;24;37m',crust='\27[38;2;17;17;27m',reset='\27[0m',bold=
+'\27[1m',dim='\27[2m'}local d={rosewater=c.rosewater,flamingo=c.flamingo,pink=c.
+pink,mauve=c.mauve,red=c.red,maroon=c.maroon,peach=c.peach,yellow=c.yellow,green
+=c.green,teal=c.teal,sky=c.sky,sapphire=c.sapphire,blue=c.blue,lavender=c.
+lavender,text=c.text,subtext1=c.subtext1,subtext0=c.subtext0,overlay2=c.overlay2
+,overlay1=c.overlay1,overlay0=c.overlay0,surface2=c.surface2,surface1=c.surface1
+,surface0=c.surface0,base=c.base,mantle=c.mantle,crust=c.crust,reset=c.reset,
+bold=c.bold,dim=c.dim,enabled=true}local function set_enabled(e)d.enabled=e if
+not e then d.rosewater=''d.flamingo=''d.pink=''d.mauve=''d.red=''d.maroon=''d.
+peach=''d.yellow=''d.green=''d.teal=''d.sky=''d.sapphire=''d.blue=''d.lavender=
+''d.text=''d.subtext1=''d.subtext0=''d.overlay2=''d.overlay1=''d.overlay0=''d.
+surface2=''d.surface1=''d.surface0=''d.base=''d.mantle=''d.crust=''d.reset=''d.
+bold=''d.dim=''else d.rosewater=c.rosewater d.flamingo=c.flamingo d.pink=c.pink
+d.mauve=c.mauve d.red=c.red d.maroon=c.maroon d.peach=c.peach d.yellow=c.yellow
+d.green=c.green d.teal=c.teal d.sky=c.sky d.sapphire=c.sapphire d.blue=c.blue d.
+lavender=c.lavender d.text=c.text d.subtext1=c.subtext1 d.subtext0=c.subtext0 d.
+overlay2=c.overlay2 d.overlay1=c.overlay1 d.overlay0=c.overlay0 d.surface2=c.
+surface2 d.surface1=c.surface1 d.surface0=c.surface0 d.base=c.base d.mantle=c.
+mantle d.crust=c.crust d.reset=c.reset d.bold=c.bold d.dim=c.dim end end
+local function get_colors()return d end local function task_name(e)return d.
+lavender..d.bold..e..d.reset end local function success(e)return d.green..d.bold
+..e..d.reset end local function error_text(e)return d.red..d.bold..e..d.reset
+end local function warning(e)return d.yellow..d.bold..e..d.reset end
+local function group_header(e)return d.mauve..d.bold..e..d.reset end
+local function dependency(e)return d.subtext0..d.dim..e..d.reset end
+local function timing(e)return d.overlay1..e..d.reset end local function
+tree_symbol(e)return d.surface2..e..d.reset end local function log_info(e)return
+d.blue..e..d.reset end local function log_warn(e)return d.yellow..d.bold..e..d.
+reset end local function log_error(e)return d.red..d.bold..e..d.reset end
+local function log_debug(e)return d.overlay1..d.dim..e..d.reset end
+local function log_color_for_level(e)if e=='INFO'then return log_info elseif e==
+'WARN'then return log_warn elseif e=='ERROR'then return log_error elseif e==
+'DEBUG'then return log_debug else return function(f)return f end end end
+local function success_symbol()return success'\u{2713}'end local function
+fail_symbol()return error_text'\u{2717}'end local function error_symbol()return
+warning'\u{26a0}'end local function running_symbol()return d.blue..'\u{27f3}'..d
+.reset end local function pending_symbol()return d.overlay1..'\u{25cb}'..d.reset
+end return{Colors=b,set_enabled=set_enabled,get_colors=get_colors,task_name=
+task_name,success=success,error_text=error_text,warning=warning,group_header=
+group_header,dependency=dependency,timing=timing,tree_symbol=tree_symbol,
+log_info=log_info,log_warn=log_warn,log_error=log_error,log_debug=log_debug,
+log_color_for_level=log_color_for_level,success_symbol=success_symbol,
+fail_symbol=fail_symbol,error_symbol=error_symbol,running_symbol=running_symbol,
+pending_symbol=pending_symbol}end function a.g()a.load'a'local b=a.load'f'local
+c={}local function get_status_symbol(d)if d=='success'then return b.
+success_symbol()elseif d=='fail'then return b.fail_symbol()elseif d=='error'then
+return b.error_symbol()elseif d=='running'then return b.running_symbol()else
+return b.pending_symbol()end end local function format_duration(d,e)if d==0 or e
+==0 then return''end local f=e-d return b.timing('('..f..'s)')end function c.
+show_execution_tree(d,e)if#d==0 then print'No tasks executed.'return end print
+'Tasks:'for f,g in ipairs(d)do local h=(f==#d)local i=h and
+'\u{2514}\u{2500}\u{2500} 'or'\u{251c}\u{2500}\u{2500} 'local j=
+get_status_symbol(g.status)local k=b.task_name(g.name)if#g.args>0 then k=k..' '
+..table.concat(g.args,' ')end local l=format_duration(g.start_time,g.end_time)if
+l~=''then l=' '..l end print(b.tree_symbol(i)..j..' '..k..l)if e and#g.
+log_messages>0 then local m=h and'    'or'\u{2502}   'for n,o in ipairs(g.
+log_messages)do local p=(n==#g.log_messages)local q=p and'\u{2514}\u{2500} 'or
+'\u{251c}\u{2500} 'local r=b.log_color_for_level(o.level)print(m..b.tree_symbol(
+q)..r(o.level..': '..o.message))end elseif not e and#g.log_messages>0 then local
+m=h and'    'or'\u{2502}   'local n=g.log_messages[#g.log_messages]local o=b.
+log_color_for_level(n.level)print(m..b.tree_symbol'\u{251c}\u{2500} '..o(n.level
+..': '..n.message))end if g.task_result and g.task_result.error~=''then local m=
+h and'    'or'\u{2502}   'print(m..b.tree_symbol'\u{251c}\u{2500} '..b.
+error_text('Error: '..g.task_result.error))end if g.task_result and#g.
+task_result.values>0 then local m=h and'    'or'\u{2502}   'local n='Result: '..
+g.task_result.result for o,p in ipairs(g.task_result.values)do n=n..', '..
+tostring(p)end print(m..b.tree_symbol'\u{2514}\u{2500} '..b.dependency(n))end
+end end function c.show_task_list(d)print'Available tasks:'print''local e={}
+local f={}for g,h in pairs(d.tasks)do if h.group and h.group~=''then if not e[h.
+group]then e[h.group]={}end table.insert(e[h.group],g)else table.insert(f,g)end
+end table.sort(f)for g,h in pairs(e)do table.sort(h)end for g,h in pairs(e)do
+print(b.group_header(g..':'))for i,j in ipairs(h)do local k=d.tasks[j]local l=''
+if#k.dependencies>0 then local m={}for n,o in ipairs(k.dependencies)do if#o.args
+>0 then table.insert(m,o.name..'('..table.concat(o.args,', ')..')')else table.
+insert(m,o.name)end end l=' '..b.dependency('[depends: '..table.concat(m,', ')..
+']')end print('  '..b.task_name(j)..l..' - '..k.description)end print''end if#f>
+0 then if next(e)~=nil then print(b.group_header'Other tasks:')end for g,h in
+ipairs(f)do local i=d.tasks[h]local j=''if#i.dependencies>0 then local k={}for l
+,m in ipairs(i.dependencies)do if#m.args>0 then table.insert(k,m.name..'('..
+table.concat(m.args,', ')..')')else table.insert(k,m.name)end end j=' '..b.
+dependency('[depends: '..table.concat(k,', ')..']')end print('  '..b.task_name(h
+)..j..' - '..i.description)end end end function c.show_execution_summary(d)if#d
+==0 then return end local e=0 local f=false for g,h in ipairs(d)do local i=h.
+end_time-h.start_time e=e+i if h.status=='fail'or h.status=='error'then f=true
+end end print''print(b.timing('Total time: '..e..'s'))if f then print(b.
+error_text'Some tasks failed!')else print(b.success
+'All tasks completed successfully!')end end function c.init(d)b.set_enabled(not
+d)end return c end end a.load'a'local b=a.load'b'local c=a.load'e'local d=a.load
+'d'local e=a.load'g'local f={task_file='taskfile.lua',log_level='INFO',parallel=
+false,max_jobs=1,show_all_logs=false,no_color=false,dry_run=false,list_tasks=
+false,show_tree=false}local function print_usage()print
+'LuaTask - Lua-based Task Runner'print''print'Usage:'print
+'  luatask [options] [task...]'print''print'Options:'print
+'  --list              List available tasks'print
+[[  --file FILE         Use custom task file (default: taskfile.lua)]]print
+'  --log-level LEVEL   Set log level (debug/info/warn/error)'print
+'  --parallel          Enable cooperative parallelism'print
+[[  --jobs N            Limit concurrent tasks (requires --parallel)]]print
+'  --all-logs          Show all log messages from each task'print
+[[  --last-log          Show only the last log message from each task (default)]]
+print'  --tree              Show dependency tree'print
+'  --dry-run           Show execution plan without running'print
+'  --no-color          Disable colored output'print
+'  --color             Force enable colors'print
+'  --help, -h          Show this help'print''print'Examples:'print
+'  luatask                     # List available tasks'print
+'  luatask build               # Run build task'print
+'  luatask build x86_64 debug  # Run build with arguments'print
+'  luatask clean build test    # Run multiple tasks'print
+[[  luatask --parallel clean build test  # Run in parallel when possible]]end
+local function parse_args(g)local h={task_file=f.task_file,log_level=f.log_level
+,parallel=f.parallel,max_jobs=f.max_jobs,show_all_logs=f.show_all_logs,no_color=
+f.no_color,dry_run=f.dry_run,list_tasks=f.list_tasks,show_tree=f.show_tree}local
+i={}local j=1 while j<=#g do local k=g[j]if k=='--help'or k=='-h'then
+print_usage()os.exit(0)elseif k=='--list'then h.list_tasks=true elseif k==
+'--file'then j=j+1 if j>#g then error'--file requires a filename'end h.task_file
+=g[j]elseif k=='--log-level'then j=j+1 if j>#g then error
+'--log-level requires a level (debug/info/warn/error)'end local l=g[j]:upper()if
+l~='DEBUG'and l~='INFO'and l~='WARN'and l~='ERROR'then error(
+'Invalid log level: '..g[j])end h.log_level=l elseif k=='--parallel'then h.
+parallel=true elseif k=='--jobs'then j=j+1 if j>#g then error
+'--jobs requires a number'end local l=tonumber(g[j])if not l or l<1 then error
+'--jobs must be a positive number'end h.max_jobs=l elseif k=='--all-logs'then h.
+show_all_logs=true elseif k=='--last-log'then h.show_all_logs=false elseif k==
+'--tree'then h.show_tree=true elseif k=='--dry-run'then h.dry_run=true elseif k
+=='--no-color'then h.no_color=true elseif k=='--color'then h.no_color=false
+elseif k:sub(1,2)=='--'then error('Unknown option: '..k)else table.insert(i,k)
+end j=j+1 end return{tasks=i,config=h}end local function list_tasks(g)e.
+show_task_list(g)end local function check_execution_results(g)local h=false for
+i,j in ipairs(g)do if j.status=='fail'or j.status=='error'then h=true break end
+end if h then os.exit(1)end end function main(g)local h=parse_args(g)e.init(h.
+config.no_color)d.set_global_level(h.config.log_level)log=d.get_log_object()
+local i,j=pcall(b.parse_file,h.config.task_file)if not i then print(
+'Error loading task file: '..tostring(j))os.exit(1)end if h.config.list_tasks or
+#h.tasks==0 then list_tasks(j)return end local k=c.run_tasks(j,h.tasks)e.
+show_execution_tree(k,h.config.show_all_logs)e.show_execution_summary(k)
+check_execution_results(k)end
+-- Entry point - call main with command line arguments
+if main then
+    main(arg or {})
+else
+    print("Error: main function not available")
+    os.exit(1)
+end

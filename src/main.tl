@@ -10,9 +10,6 @@ local Display       = require('display')
 -- Global log object for tasks
 global log: {string: function(string)}
 
-local record Main
-end
-
 -- Default configuration values
 local DEFAULT_CONFIG: Types.Config = {
     task_file = "taskfile.lua",
@@ -157,7 +154,7 @@ local function check_execution_results(executions: {Types.TaskExecution})
 end
 
 -- Main entry point
-function Main.main(args: {string})
+global function main(args: {string})
     local cli_args = parse_args(args)
 
     -- Initialize display and logger systems
@@ -188,5 +185,3 @@ function Main.main(args: {string})
     -- Exit with appropriate code
     check_execution_results(executions)
 end
-
-return Main

@@ -3,22 +3,22 @@ src_dir := "src"
 examples_dir := "examples"
 tests_dir := "tests"
 
-default: clean build format bundle minify
+default: clean build format bundle minify create test
 
-@format:
-    stylua {{build_dir}}/*.lua
-
-@create: build
+@create:
     lua scripts/create-executable.lua
 
 bundle:
     darklua process {{build_dir}}/main.lua {{build_dir}}/luatask.lua
 
 minify:
-    darklua minify {{build_dir}}/luatask.lua {{build_dir}}/luatask-min.lua
+    darklua minify {{build_dir}}/luatask.lua {{build_dir}}/luatask-minified.lua
 
 @build:
     cyan build
+
+@format:
+    stylua {{build_dir}}/*.lua
 
 @check:
     cyan check
@@ -67,18 +67,11 @@ lint:
     @echo "Linting Teal code..."
     cyan check {{src_dir}}/**/*.tl
 
-# Run tests (when implemented)
-test: build
-    @echo "Running tests..."
-    @if [ -d "{{tests_dir}}" ] && [ -n "$(ls -A {{tests_dir}}/*.tl 2>/dev/null)" ]; then \
-        for test in {{tests_dir}}/*.tl; do \
-            echo "Running $$(basename $$test)..."; \
-            cd {{build_dir}} && lua "$$(basename $$test .tl).lua" || exit 1; \
-        done; \
-        echo "All tests passed!"; \
-    else \
-        echo "No tests found in {{tests_dir}}"; \
-    fi
+bench:
+  hyperfine './lust' -N --warmup 10 --runs 500 --export-markdown bench.md
+
+test:
+  ./lust --list
 
 # Development setup
 setup:

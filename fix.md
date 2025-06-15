@@ -5,4 +5,5 @@ to fix:
 - the list output needs restuctruring
   - #group
   -   task [args...]: dependencies...   - description
-- wrap errors when task doesnt exist
+- bubble up errors when task doesnt exist
+- change return to be optional, no return means success, fail using error() and assert()
