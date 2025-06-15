@@ -5,6 +5,7 @@ local Types = require('types')
 local Parser = require('parser')
 local Runner = require('runner')
 local LoggerModule = require('logger')
+local Display = require('display')
 
 -- Global log object for tasks
 global log: {string: function(string)}
@@ -38,7 +39,8 @@ local function print_usage()
     print("  --log-level LEVEL   Set log level (debug/info/warn/error)")
     print("  --parallel          Enable cooperative parallelism")
     print("  --jobs N            Limit concurrent tasks (requires --parallel)")
-    print("  --all-logs          Show all logs vs just last message")
+    print("  --all-logs          Show all log messages from each task")
+    print("  --last-log          Show only the last log message from each task (default)")
     print("  --tree              Show dependency tree")
     print("  --dry-run           Show execution plan without running")
     print("  --no-color          Disable colored output")
@@ -108,6 +110,8 @@ local function parse_args(args: {string}): Types.CliArgs
             config.max_jobs = jobs
         elseif current_arg == "--all-logs" then
             config.show_all_logs = true
+        elseif current_arg == "--last-log" then
+            config.show_all_logs = false
         elseif current_arg == "--tree" then
             config.show_tree = true
         elseif current_arg == "--dry-run" then
@@ -132,131 +136,23 @@ local function parse_args(args: {string}): Types.CliArgs
     }
 end
 
--- List available tasks in a simple format
+-- List available tasks using the display system
 local function list_tasks(registry: Types.TaskRegistry)
-    print("Available tasks:")
-    print("")
-
-    -- Group tasks by group
-    local groups: {string: {string}} = {}
-    local ungrouped: {string} = {}
-
-    for name, task in pairs(registry.tasks) do
-        if task.group and task.group ~= "" then
-            if not groups[task.group] then
-                groups[task.group] = {}
-            end
-            table.insert(groups[task.group], name)
-        else
-            table.insert(ungrouped, name)
-        end
-    end
-
-    -- Sort task names
-    table.sort(ungrouped)
-    for _, task_list in pairs(groups) do
-        table.sort(task_list)
-    end
-
-    -- Print grouped tasks
-    for group, task_list in pairs(groups) do
-        print(group .. ":")
-        for _, name in ipairs(task_list) do
-            local task = registry.tasks[name]
-            local deps = ""
-            if #task.dependencies > 0 then
-                local dep_names: {string} = {}
-                for _, dep in ipairs(task.dependencies) do
-                    if #dep.args > 0 then
-                        table.insert(dep_names, dep.name .. "(" .. table.concat(dep.args, ", ") .. ")")
-                    else
-                        table.insert(dep_names, dep.name)
-                    end
-                end
-                deps = " [depends: " .. table.concat(dep_names, ", ") .. "]"
-            end
-            print("  " .. name .. deps .. " - " .. task.description)
-        end
-        print("")
-    end
-
-    -- Print ungrouped tasks
-    if #ungrouped > 0 then
-        if next(groups) ~= nil then
-            print("Other tasks:")
-        end
-        for _, name in ipairs(ungrouped) do
-            local task = registry.tasks[name]
-            local deps = ""
-            if #task.dependencies > 0 then
-                local dep_names: {string} = {}
-                for _, dep in ipairs(task.dependencies) do
-                    if #dep.args > 0 then
-                        table.insert(dep_names, dep.name .. "(" .. table.concat(dep.args, ", ") .. ")")
-                    else
-                        table.insert(dep_names, dep.name)
-                    end
-                end
-                deps = " [depends: " .. table.concat(dep_names, ", ") .. "]"
-            end
-            print("  " .. name .. deps .. " - " .. task.description)
-        end
-    end
+    Display.show_task_list(registry)
 end
 
--- Print execution results
-local function print_results(executions: {Types.TaskExecution})
-    print("")
-    print("Execution summary:")
-
-    local total_time: number = 0
+-- Check execution results and exit with appropriate code
+local function check_execution_results(executions: {Types.TaskExecution})
     local any_failed = false
-
     for _, exec in ipairs(executions) do
-        local duration = exec.end_time - exec.start_time
-        total_time = total_time + duration
-
-        local status_symbol = "?"
-        if exec.status == "success" then
-            status_symbol = "✓"
-        elseif exec.status == "fail" then
-            status_symbol = "✗"
+        if exec.status == "fail" or exec.status == "error" then
             any_failed = true
-        elseif exec.status == "error" then
-            status_symbol = "⚠"
-            any_failed = true
-        end
-
-        local args_str = ""
-        if #exec.args > 0 then
-            args_str = " " .. table.concat(exec.args, " ")
-        end
-
-        print("  " .. status_symbol .. " " .. exec.name .. args_str .. " (" .. duration .. "s)")
-
-        -- Show error if present
-        if exec.task_result.error ~= "" then
-            print("    Error: " .. exec.task_result.error)
-        end
-
-        -- Show additional return values
-        if #exec.task_result.values > 0 then
-            local values_str = "Result: " .. exec.task_result.result
-            for _, value in ipairs(exec.task_result.values) do
-                values_str = values_str .. ", " .. tostring(value)
-            end
-            print("    " .. values_str)
+            break
         end
     end
 
-    print("")
-    print("Total time: " .. total_time .. "s")
-
     if any_failed then
-        print("Some tasks failed!")
         os.exit(1)
-    else
-        print("All tasks completed successfully!")
     end
 end
 
@@ -264,7 +160,8 @@ end
 function Main.main(args: {string})
     local cli_args = parse_args(args)
 
-    -- Initialize logger with config and set global log object
+    -- Initialize display and logger systems
+    Display.init(cli_args.config.no_color)
     LoggerModule.set_global_level(cli_args.config.log_level)
     log = LoggerModule.get_log_object()
 
@@ -282,10 +179,14 @@ function Main.main(args: {string})
     end
 
     -- Run tasks
-    print("Running tasks from: " .. cli_args.config.task_file)
     local executions = Runner.run_tasks(registry, cli_args.tasks)
 
-    print_results(executions)
+    -- Display results using the execution tree
+    Display.show_execution_tree(executions, cli_args.config.show_all_logs)
+    Display.show_execution_summary(executions)
+
+    -- Exit with appropriate code
+    check_execution_results(executions)
 end
 
 return Main

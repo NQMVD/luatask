@@ -47,12 +47,6 @@ local function add_message(self, level, message)
    end
 
 
-   local prefix = "[" .. level .. "]"
-   if self.current_task ~= "" then
-      prefix = "[" .. self.current_task .. "] " .. prefix
-   end
-
-   print(prefix .. " " .. message)
 end
 
 
@@ -81,14 +75,6 @@ local function error_log(self, message)
 end
 
 
-local function get_task_messages(self, task_name)
-   return self.messages[task_name] or {}
-end
-
-
-local function clear_task_messages(self, task_name)
-   self.messages[task_name] = {}
-end
 
 
 local function new_logger(min_level, show_colors)

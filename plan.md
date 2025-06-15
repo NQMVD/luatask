@@ -367,16 +367,13 @@ Execution tree:
 ├── clean ✓ (0.1s)
 ├── build x86_64 release ✓ (2.3s)
 │   ├─ INFO: Building x86_64 in release mode...
-│   ├─ Result: SUCCESS, 1623456789, 2
-│   └─ DEBUG: Created bin/myapp, lib/libmyapp.a
+│   └─ Result: SUCCESS, 1623456789, 2
 ├── test ✓ (1.8s)
 │   ├─ INFO: Running tests...
-│   ├─ Result: SUCCESS, 42
-│   └─ INFO: All 42 tests passed
+│   └─ Result: SUCCESS, 42
 ├── deploy_staging ✓ (0.5s)
 │   ├─ INFO: Deploying to staging...
-│   ├─ Result: SUCCESS, deploy-1623456790
-│   └─ INFO: Deployed as deploy-1623456790
+│   └─ Result: SUCCESS, deploy-1623456790
 └── deploy_production ✓ (0.3s)
     ├─ INFO: Deploying to production...
     └─ Result: SUCCESS

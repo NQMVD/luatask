@@ -106,63 +106,31 @@ local function execute_task(registry, execution)
    LoggerModule.set_global_task(execution.name)
 
 
+   local logger = LoggerModule.get_global_logger()
+   logger.messages[execution.name] = {}
+
+
    log = LoggerModule.get_log_object()
 
 
    local processed_args = {}
 
    if task.arguments then
-      local arg_index = 1
-      for arg_name, spec in pairs(task.arguments) do
-         local arg_value = execution.args[arg_index]
 
+      for i, task_arg in ipairs(execution.args) do
 
-         if not arg_value and spec.default ~= nil then
-            arg_value = tostring(spec.default)
-         end
-
-
-         if spec.required and not arg_value then
-            return {
-               success = false,
-               result = Result.FAIL,
-               values = {},
-               error = "Required argument '" .. arg_name .. "' not provided",
-            }
-         end
-
-
-         if arg_value then
-            if spec.type == "number" then
-               local num = tonumber(arg_value)
-               if not num then
-                  return {
-                     success = false,
-                     result = Result.FAIL,
-                     values = {},
-                     error = "Argument '" .. arg_name .. "' must be a number",
-                  }
-               end
-               processed_args[arg_index] = num
-            elseif spec.type == "boolean" then
-               if arg_value == "true" then
-                  processed_args[arg_index] = true
-               elseif arg_value == "false" then
-                  processed_args[arg_index] = false
-               else
-                  return {
-                     success = false,
-                     result = Result.FAIL,
-                     values = {},
-                     error = "Argument '" .. arg_name .. "' must be 'true' or 'false'",
-                  }
-               end
+         if task_arg == "true" then
+            processed_args[i] = true
+         elseif task_arg == "false" then
+            processed_args[i] = false
+         else
+            local num = tonumber(task_arg)
+            if num then
+               processed_args[i] = num
             else
-               processed_args[arg_index] = arg_value
+               processed_args[i] = task_arg
             end
          end
-
-         arg_index = arg_index + 1
       end
    else
 
@@ -256,6 +224,12 @@ function Runner.run_tasks(registry, task_specs)
       execution.task_result = execute_task(registry, execution)
 
       execution.end_time = os.time()
+
+
+      local logger = LoggerModule.get_global_logger()
+      if logger.messages[execution.name] then
+         execution.log_messages = logger.messages[execution.name]
+      end
 
       if execution.task_result.success and Result.is_success(execution.task_result.result) then
          execution.status = "success"

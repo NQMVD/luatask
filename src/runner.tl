@@ -105,6 +105,10 @@ local function execute_task(registry: Types.TaskRegistry, execution: Types.TaskE
     -- Set up logging context for this task
     LoggerModule.set_global_task(execution.name)
 
+    -- Clear any existing messages for this task
+    local logger = LoggerModule.get_global_logger()
+    logger.messages[execution.name] = {}
+
     -- Set global log object for this task
     log = LoggerModule.get_log_object()
 
@@ -112,57 +116,21 @@ local function execute_task(registry: Types.TaskRegistry, execution: Types.TaskE
     local processed_args: {any} = {}
 
     if task.arguments then
-        local arg_index = 1
-        for arg_name, spec in pairs(task.arguments) do
-            local arg_value = execution.args[arg_index]
-
-            -- Apply default if no value provided
-            if not arg_value and spec.default ~= nil then
-                arg_value = tostring(spec.default)
-            end
-
-            -- Check required arguments
-            if spec.required and not arg_value then
-                return {
-                    success = false,
-                    result = Result.FAIL,
-                    values = {},
-                    error = "Required argument '" .. arg_name .. "' not provided"
-                }
-            end
-
-            -- Basic type conversion
-            if arg_value then
-                if spec.type == "number" then
-                    local num = tonumber(arg_value)
-                    if not num then
-                        return {
-                            success = false,
-                            result = Result.FAIL,
-                            values = {},
-                            error = "Argument '" .. arg_name .. "' must be a number"
-                        }
-                    end
-                    processed_args[arg_index] = num
-                elseif spec.type == "boolean" then
-                    if arg_value == "true" then
-                        processed_args[arg_index] = true
-                    elseif arg_value == "false" then
-                        processed_args[arg_index] = false
-                    else
-                        return {
-                            success = false,
-                            result = Result.FAIL,
-                            values = {},
-                            error = "Argument '" .. arg_name .. "' must be 'true' or 'false'"
-                        }
-                    end
+        -- Process arguments positionally with basic type conversion
+        for i, task_arg in ipairs(execution.args) do
+            -- Try to convert based on common patterns
+            if task_arg == "true" then
+                processed_args[i] = true
+            elseif task_arg == "false" then
+                processed_args[i] = false
+            else
+                local num = tonumber(task_arg)
+                if num then
+                    processed_args[i] = num
                 else
-                    processed_args[arg_index] = arg_value
+                    processed_args[i] = task_arg
                 end
             end
-
-            arg_index = arg_index + 1
         end
     else
         -- No validation, just pass through as strings
@@ -256,6 +224,12 @@ function Runner.run_tasks(registry: Types.TaskRegistry, task_specs: {string}): {
         execution.task_result = execute_task(registry, execution)
 
         execution.end_time = os.time()
+
+        -- Collect log messages from the logger
+        local logger = LoggerModule.get_global_logger()
+        if logger.messages[execution.name] then
+            execution.log_messages = logger.messages[execution.name]
+        end
 
         if execution.task_result.success and Result.is_success(execution.task_result.result) then
             execution.status = "success"

@@ -46,13 +46,7 @@ local function add_message(self: Logger, level: string, message: string)
         table.insert(self.messages[self.current_task], log_message)
     end
 
-    -- Also print immediately for now
-    local prefix = "[" .. level .. "]"
-    if self.current_task ~= "" then
-        prefix = "[" .. self.current_task .. "] " .. prefix
-    end
-
-    print(prefix .. " " .. message)
+    -- Don't print immediately - messages will be displayed by the display system
 end
 
 -- Set the current task context for logging
@@ -80,15 +74,7 @@ local function error_log(self: Logger, message: string)
     add_message(self, "ERROR", message)
 end
 
--- Get messages for a specific task
-local function get_task_messages(self: Logger, task_name: string): {Types.LogMessage}
-    return self.messages[task_name] or {}
-end
 
--- Clear messages for a task
-local function clear_task_messages(self: Logger, task_name: string)
-    self.messages[task_name] = {}
-end
 
 -- Create a new logger instance
 local function new_logger(min_level: string, show_colors: boolean): Logger
