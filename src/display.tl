@@ -69,20 +69,20 @@ function Display.show_execution_tree(executions: {Types.TaskExecution}, show_all
                 local is_last_log = (j == #exec.log_messages)
                 local log_connector = is_last_log and "└─ " or "├─ "
                 local color_func = Colors.log_color_for_level(log_msg.level)
-                print(log_prefix .. Colors.tree_symbol(log_connector) .. color_func(log_msg.level .. ": " .. log_msg.message))
+                print(Colors.tree_symbol(log_prefix) .. Colors.tree_symbol(log_connector) .. color_func(log_msg.level .. ": " .. log_msg.message))
             end
         elseif not show_all_logs and #exec.log_messages > 0 then
             -- Show only the last log message
             local log_prefix = is_last and "    " or "│   "
             local last_msg = exec.log_messages[#exec.log_messages]
             local color_func = Colors.log_color_for_level(last_msg.level)
-            print(log_prefix .. Colors.tree_symbol("├─ ") .. color_func(last_msg.level .. ": " .. last_msg.message))
+            print(Colors.tree_symbol(log_prefix) .. Colors.tree_symbol("├─ ") .. color_func(last_msg.level .. ": " .. last_msg.message))
         end
 
         -- Show error message if present
         if exec.task_result and exec.task_result.error ~= "" then
             local log_prefix = is_last and "    " or "│   "
-            print(log_prefix .. Colors.tree_symbol("├─ ") .. Colors.error_text("Error: " .. exec.task_result.error))
+            print(Colors.tree_symbol(log_prefix) .. Colors.tree_symbol("├─ ") .. Colors.error_text("Error: " .. exec.task_result.error))
         end
 
         -- Show task results if available
@@ -92,7 +92,7 @@ function Display.show_execution_tree(executions: {Types.TaskExecution}, show_all
             for _, value in ipairs(exec.task_result.values) do
                 values_str = values_str .. ", " .. tostring(value)
             end
-            print(log_prefix .. Colors.tree_symbol("└─ ") .. Colors.dependency(values_str))
+            print(Colors.tree_symbol(log_prefix) .. Colors.tree_symbol("└─ ") .. Colors.dependency(values_str))
         end
     end
 end

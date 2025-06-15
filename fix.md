@@ -1,9 +1,15 @@
 to fix:
+- fix tree sturcture BEING FAKE
 - last result not shown when there are results
-- vert lines beeing white istead of gray
 - every task should be run in a thread for showing the running status
 - the list output needs restuctruring
   - #group
   -   task [args...]: dependencies...   - description
 - bubble up errors when task doesnt exist
 - change return to be optional, no return means success, fail using error() and assert()
+- add luash as built in lib for running shell commands
+  - make sure to add a silent mode for running commands
+- add a default task that runs when no task is specified
+- add --timings flag, by default times should be shown of longer than 1s, if timing flag is on, show ms
+- simplify task structure
+  - index instead of keys as alternative

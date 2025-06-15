@@ -2,6 +2,7 @@
 -- This file shows how to define tasks with dependencies, arguments, validation, and logging
 
 local tasks = {}
+local f = string.format
 
 -- Build group tasks
 tasks.clean = {
@@ -9,138 +10,123 @@ tasks.clean = {
   group = "build",
   run = function()
     log.info("Cleaning build directory...")
-    log.debug("Removing obj/, bin/, and dist/ directories")
-    -- Simulate cleanup work
+    os.execute("rip build")
     log.info("Build artifacts cleaned")
-    return SUCCESS
-  end
-}
-
-tasks.deps = {
-  description = "Check system dependencies",
-  group = "build",
-  run = function()
-    log.info("Checking system dependencies...")
-    log.debug("Checking for gcc, make, pkg-config...")
-    -- Simulate dependency check
-    log.warn("Some optional dependencies missing, continuing anyway")
-    return SUCCESS, "gcc-11.2", "make-4.3"
+    return "SUCCESS"
   end
 }
 
 tasks.build = {
-  description = "Build project [target] [mode='release']",
+  description = "Build by generating teal files",
   group = "build",
-  dependencies = { "clean", "deps" },
-  arguments = {
-    target = { required = true, type = "string" },
-    mode = { required = false, default = "release", type = "string" }
-  },
-  run = function(target, mode)
-    log.info("Building " .. target .. " in " .. mode .. " mode...")
-    log.debug("Compiling source files...")
-    log.debug("Linking executable...")
+  dependencies = { "clean" },
+  run = function()
+    log.info("Compiling Teal sources...")
+    os.execute("cyan build")
+    log.info("Teal sources compiled successfully")
+    return "SUCCESS"
+  end
+}
 
-    if mode == "debug" then
-      log.warn("Debug mode: optimizations disabled")
+tasks.bundle = {
+  description = "Bundle Lua files into a single file",
+  group = "build",
+  dependencies = { "build", "format" },
+  run = function()
+    log.info("Bundling Lua files into a single file...")
+    os.execute("darklua process build/main.lua build/luatask.lua")
+    log.info("Lua files bundled successfully")
+    return "SUCCESS"
+  end
+}
+
+tasks.minify = {
+  description = "Minify bundled Lua file",
+  group = "build",
+  run = function()
+    log.info("Minifying bundled Lua file...")
+    os.execute("darklua minify build/luatask.lua build/luatask-minified.lua")
+    log.info("Lua file minified successfully")
+    return "SUCCESS"
+  end
+}
+
+tasks.create = {
+  description = "Create lua executable",
+  group = "build",
+  dependencies = { "bundle", "minify" },
+  run = function()
+    log.info("Creating Lua executable...")
+
+    local final_file = "build/luatask-minified.lua"
+    local exe_name = "lust"
+
+    local function read_file(filename)
+      local file = io.open(filename, "r")
+      if not file then
+        error("Could not open file: " .. filename)
+      end
+      local content = file:read("*all")
+      file:close()
+      return content
     end
 
-    -- Simulate build time based on target
-    local build_time = target == "x86_64" and 2.3 or 1.8
-    local artifact_count = target == "arm64" and 15 or 12
-
-    log.info("Build completed successfully")
-    return SUCCESS, os.time(), artifact_count
-  end
-}
-
--- Testing group
-tasks.test_unit = {
-  description = "Run unit tests [pattern...]",
-  group = "testing",
-  dependencies = { { "build", "x86_64", "debug" } },
-  run = function(...)
-    local patterns = { ... }
-    log.info("Running unit tests...")
-
-    if #patterns > 0 then
-      log.info("Filtering tests with patterns: " .. table.concat(patterns, ", "))
+    local function write_file(filename, content)
+      local file = io.open(filename, "w")
+      if not file then
+        error("Could not create file: " .. filename)
+      end
+      file:write(content)
+      file:close()
     end
 
-    log.debug("Running test suite...")
-    log.info("All unit tests passed")
-    return SUCCESS, 42 -- number of tests
+    local function create_executable()
+      -- Read the minified bundled Lua code
+      local lua_code = read_file(final_file)
+
+      -- Create executable script with shebang
+      local executable_content = [[
+#!/usr/bin/env lua
+-- LuaTask Standalone Executable
+-- Generated from Teal sources via darklua processing and minification
+
+]] .. lua_code .. [[
+
+-- Entry point - call main with command line arguments
+if main then
+    main(arg or {})
+else
+    print("Error: main function not available")
+    os.exit(1)
+end
+    ]]
+
+      -- Write executable file
+      write_file("build/luatask", executable_content)
+
+      -- Make executable (Unix/Linux/macOS)
+      os.execute("chmod +x build/luatask")
+    end
+
+    -- Create the executable
+    create_executable()
+
+    -- move up the executable to the current directory
+    os.execute("mv build/luatask ./" .. exe_name)
+
+    log.info("Lua executable created successfully")
+    return "SUCCESS"
   end
 }
 
-tasks.test_integration = {
-  description = "Run integration tests",
-  group = "testing",
-  dependencies = { { "build", "x86_64", "release" } },
+tasks.format = {
+  description = "Format generated Lua files",
+  group = "build",
   run = function()
-    log.info("Running integration tests...")
-    log.debug("Starting test database...")
-    log.debug("Running integration suite...")
-    log.info("Integration tests completed")
-    return SUCCESS, 8 -- number of integration tests
-  end
-}
-
-tasks.test = {
-  description = "Run all tests",
-  group = "testing",
-  dependencies = { "test_unit", "test_integration" },
-  run = function()
-    log.info("All tests completed successfully")
-    return SUCCESS
-  end
-}
-
--- Deploy group
-tasks.package = {
-  description = "Package application [format='tar']",
-  group = "deploy",
-  dependencies = { { "build", "x86_64", "release" }, "test" },
-  arguments = {
-    format = { required = false, default = "tar", type = "string" }
-  },
-  run = function(format)
-    log.info("Packaging application in " .. format .. " format...")
-    log.debug("Creating package structure...")
-    log.debug("Compressing files...")
-
-    local package_name = "myapp-1.0.0." .. format
-    log.info("Package created: " .. package_name)
-    return SUCCESS, package_name, 1024000 -- package size in bytes
-  end
-}
-
-tasks.deploy_staging = {
-  description = "Deploy to staging environment",
-  group = "deploy",
-  dependencies = { { "package", "tar" } },
-  run = function()
-    log.info("Deploying to staging...")
-    log.debug("Uploading package to staging server...")
-    log.debug("Running deployment scripts...")
-    log.warn("Staging deployment uses test database")
-
-    local deploy_id = "deploy-" .. os.time()
-    log.info("Deployed to staging as " .. deploy_id)
-    return SUCCESS, deploy_id
-  end
-}
-
-tasks.deploy_production = {
-  description = "Deploy to production environment",
-  group = "deploy",
-  dependencies = { "deploy_staging" },
-  run = function()
-    log.info("Deploying to production...")
-    log.debug("Final safety checks...")
-    log.debug("Rolling deployment to production servers...")
-    log.info("Production deployment completed")
-    return SUCCESS
+    log.info("Formatting Lua sources...")
+    os.execute("stylua build/*.lua")
+    log.info("Lua sources formatted successfully")
+    return "SUCCESS"
   end
 }
 
@@ -150,7 +136,7 @@ tasks.version = {
   run = function()
     log.info("MyApp version 1.0.0")
     log.info("Built with LuaTask")
-    return SUCCESS, "1.0.0", "2024-01-15"
+    return "SUCCESS", "1.0.0", "2024-01-15"
   end
 }
 
@@ -167,7 +153,7 @@ tasks.benchmark = {
 
     local avg_time = 0.045 -- milliseconds
     log.info("Benchmark completed - average: " .. avg_time .. "ms")
-    return SUCCESS, avg_time, iterations
+    return "SUCCESS", avg_time, iterations
   end
 }
 
@@ -178,7 +164,7 @@ tasks.lint = {
     log.debug("Checking style guidelines...")
     log.warn("Found 3 style warnings")
     log.info("Linting completed")
-    return SUCCESS, 3 -- warning count
+    return "SUCCESS", 3 -- warning count
   end
 }
 
@@ -216,7 +202,7 @@ tasks.configure = {
     end
 
     log.info("Configuration completed")
-    return SUCCESS, env, debug, workers
+    return "SUCCESS", env, debug, workers
   end
 }
 

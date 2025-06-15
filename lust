@@ -182,41 +182,41 @@ get_status_symbol(g.status)local k=b.task_name(g.name)if#g.args>0 then k=k..' '
 l~=''then l=' '..l end print(b.tree_symbol(i)..j..' '..k..l)if e and#g.
 log_messages>0 then local m=h and'    'or'\u{2502}   'for n,o in ipairs(g.
 log_messages)do local p=(n==#g.log_messages)local q=p and'\u{2514}\u{2500} 'or
-'\u{251c}\u{2500} 'local r=b.log_color_for_level(o.level)print(m..b.tree_symbol(
-q)..r(o.level..': '..o.message))end elseif not e and#g.log_messages>0 then local
-m=h and'    'or'\u{2502}   'local n=g.log_messages[#g.log_messages]local o=b.
-log_color_for_level(n.level)print(m..b.tree_symbol'\u{251c}\u{2500} '..o(n.level
-..': '..n.message))end if g.task_result and g.task_result.error~=''then local m=
-h and'    'or'\u{2502}   'print(m..b.tree_symbol'\u{251c}\u{2500} '..b.
-error_text('Error: '..g.task_result.error))end if g.task_result and#g.
-task_result.values>0 then local m=h and'    'or'\u{2502}   'local n='Result: '..
-g.task_result.result for o,p in ipairs(g.task_result.values)do n=n..', '..
-tostring(p)end print(m..b.tree_symbol'\u{2514}\u{2500} '..b.dependency(n))end
-end end function c.show_task_list(d)print'Available tasks:'print''local e={}
-local f={}for g,h in pairs(d.tasks)do if h.group and h.group~=''then if not e[h.
-group]then e[h.group]={}end table.insert(e[h.group],g)else table.insert(f,g)end
-end table.sort(f)for g,h in pairs(e)do table.sort(h)end for g,h in pairs(e)do
-print(b.group_header(g..':'))for i,j in ipairs(h)do local k=d.tasks[j]local l=''
-if#k.dependencies>0 then local m={}for n,o in ipairs(k.dependencies)do if#o.args
->0 then table.insert(m,o.name..'('..table.concat(o.args,', ')..')')else table.
-insert(m,o.name)end end l=' '..b.dependency('[depends: '..table.concat(m,', ')..
-']')end print('  '..b.task_name(j)..l..' - '..k.description)end print''end if#f>
-0 then if next(e)~=nil then print(b.group_header'Other tasks:')end for g,h in
-ipairs(f)do local i=d.tasks[h]local j=''if#i.dependencies>0 then local k={}for l
-,m in ipairs(i.dependencies)do if#m.args>0 then table.insert(k,m.name..'('..
-table.concat(m.args,', ')..')')else table.insert(k,m.name)end end j=' '..b.
-dependency('[depends: '..table.concat(k,', ')..']')end print('  '..b.task_name(h
-)..j..' - '..i.description)end end end function c.show_execution_summary(d)if#d
-==0 then return end local e=0 local f=false for g,h in ipairs(d)do local i=h.
-end_time-h.start_time e=e+i if h.status=='fail'or h.status=='error'then f=true
-end end print''print(b.timing('Total time: '..e..'s'))if f then print(b.
-error_text'Some tasks failed!')else print(b.success
-'All tasks completed successfully!')end end function c.init(d)b.set_enabled(not
-d)end return c end end a.load'a'local b=a.load'b'local c=a.load'e'local d=a.load
-'d'local e=a.load'g'local f={task_file='taskfile.lua',log_level='INFO',parallel=
-false,max_jobs=1,show_all_logs=false,no_color=false,dry_run=false,list_tasks=
-false,show_tree=false}local function print_usage()print
-'LuaTask - Lua-based Task Runner'print''print'Usage:'print
+'\u{251c}\u{2500} 'local r=b.log_color_for_level(o.level)print(b.tree_symbol(m)
+..b.tree_symbol(q)..r(o.level..': '..o.message))end elseif not e and#g.
+log_messages>0 then local m=h and'    'or'\u{2502}   'local n=g.log_messages[#g.
+log_messages]local o=b.log_color_for_level(n.level)print(b.tree_symbol(m)..b.
+tree_symbol'\u{251c}\u{2500} '..o(n.level..': '..n.message))end if g.task_result
+and g.task_result.error~=''then local m=h and'    'or'\u{2502}   'print(b.
+tree_symbol(m)..b.tree_symbol'\u{251c}\u{2500} '..b.error_text('Error: '..g.
+task_result.error))end if g.task_result and#g.task_result.values>0 then local m=
+h and'    'or'\u{2502}   'local n='Result: '..g.task_result.result for o,p in
+ipairs(g.task_result.values)do n=n..', '..tostring(p)end print(b.tree_symbol(m)
+..b.tree_symbol'\u{2514}\u{2500} '..b.dependency(n))end end end function c.
+show_task_list(d)print'Available tasks:'print''local e={}local f={}for g,h in
+pairs(d.tasks)do if h.group and h.group~=''then if not e[h.group]then e[h.group]
+={}end table.insert(e[h.group],g)else table.insert(f,g)end end table.sort(f)for
+g,h in pairs(e)do table.sort(h)end for g,h in pairs(e)do print(b.group_header(g
+..':'))for i,j in ipairs(h)do local k=d.tasks[j]local l=''if#k.dependencies>0
+then local m={}for n,o in ipairs(k.dependencies)do if#o.args>0 then table.
+insert(m,o.name..'('..table.concat(o.args,', ')..')')else table.insert(m,o.name)
+end end l=' '..b.dependency('[depends: '..table.concat(m,', ')..']')end print(
+'  '..b.task_name(j)..l..' - '..k.description)end print''end if#f>0 then if
+next(e)~=nil then print(b.group_header'Other tasks:')end for g,h in ipairs(f)do
+local i=d.tasks[h]local j=''if#i.dependencies>0 then local k={}for l,m in
+ipairs(i.dependencies)do if#m.args>0 then table.insert(k,m.name..'('..table.
+concat(m.args,', ')..')')else table.insert(k,m.name)end end j=' '..b.dependency(
+'[depends: '..table.concat(k,', ')..']')end print('  '..b.task_name(h)..j..' - '
+..i.description)end end end function c.show_execution_summary(d)if#d==0 then
+return end local e=0 local f=false for g,h in ipairs(d)do local i=h.end_time-h.
+start_time e=e+i if h.status=='fail'or h.status=='error'then f=true end end
+print''print(b.timing('Total time: '..e..'s'))if f then print(b.error_text
+'Some tasks failed!')else print(b.success'All tasks completed successfully!')end
+end function c.init(d)b.set_enabled(not d)end return c end end a.load'a'local b=
+a.load'b'local c=a.load'e'local d=a.load'd'local e=a.load'g'local f={task_file=
+'taskfile.lua',log_level='INFO',parallel=false,max_jobs=1,show_all_logs=false,
+no_color=false,dry_run=false,list_tasks=false,show_tree=false}local function
+print_usage()print'LuaTask - Lua-based Task Runner'print''print'Usage:'print
 '  luatask [options] [task...]'print''print'Options:'print
 '  --list              List available tasks'print
 [[  --file FILE         Use custom task file (default: taskfile.lua)]]print
@@ -269,3 +269,4 @@ else
     print("Error: main function not available")
     os.exit(1)
 end
+    
