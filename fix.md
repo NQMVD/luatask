@@ -1,15 +1,21 @@
 to fix:
-- fix tree sturcture BEING FAKE
+- fix tree sturcture BEING FAKE, its not a tree, its a list
 - last result not shown when there are results
 - every task should be run in a thread for showing the running status
+  - consider using pueue as a backend for running tasks, no multi threading needed, just cororutines
 - the list output needs restuctruring
-  - #group
+  - group
   -   task [args...]: dependencies...   - description
-- bubble up errors when task doesnt exist
-- change return to be optional, no return means success, fail using error() and assert()
-- add luash as built in lib for running shell commands
+- bubble up errors when task doesnt exist, right now it fails some where down the line
+- change return to be optional, no return means success, fail using error() and assert(), use return only for returning values
+- add luash lib as built in lib for running shell commands
   - make sure to add a silent mode for running commands
-- add a default task that runs when no task is specified
+- add a default task option for tasks that runs when no task is specified
 - add --timings flag, by default times should be shown of longer than 1s, if timing flag is on, show ms
 - simplify task structure
   - index instead of keys as alternative
+- figure out a way to clear lines for drawing a corner when nomore messages or no return is printed
+  - parsing the tasks would make this a whole lot easier... but that would be overkill
+-> store the entire output in a buffer and just edit the buffer then redraw the buffer
+  - needed for the other variant of nested trees
+  - would also be needed for when threads are a thing

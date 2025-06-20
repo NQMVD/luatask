@@ -1,398 +1,520 @@
-# LuaTask - Lua-based Task Runner
+# LuaTask - Lua-based Task Runner (Refactored)
 
-A Just-inspired task runner written in Teal that uses Lua for both the executable and task files, featuring tree-structured task display, cooperative parallelism, and beautiful Catppuccin Mocha theming.
+A Just-inspired task runner written in Teal that uses Lua for both the executable and task files, featuring **true tree-structured** task display, proper threading/process management, and beautiful Catppuccin Mocha theming.
 
 ## Project Overview
 
-### Core Requirements
+### Core Requirements (Updated)
 - **Task runner inspired by Just** - Simple, declarative task definitions
 - **Lua-based** - Both the executable and task files use Lua/Teal
-- **Tree structure display** - Show task dependencies and execution visually
-- **Leveled logging system** - Configurable log output with multiple display modes
-- **Exit handling** - Clear success/failure states using enums
+- **True tree structure display** - Proper hierarchical task dependencies and execution (not fake lists)
+- **Real threading/process management** - Tasks run with actual status tracking
+- **Leveled logging system** - Configurable log output with buffer-based display
+- **Exit handling** - Clear success/failure states using optional returns and error()/assert()
 - **Written in Teal** - Typed Lua for better maintainability
 - **Just-like arguments** - Tasks support positional arguments with defaults
-- **Cooperative parallelism** - Independent tasks can run concurrently
-- **Task grouping** - Organize tasks by category
+- **Dual execution models** - Pueue backend OR native threading options
+- **Task grouping** - Organize tasks by category with improved display
 - **Catppuccin Mocha theming** - Beautiful colored output with bold text
+- **Built-in shell support** - luash library for shell commands with silent mode
+- **Default task support** - Task that runs when no specific task is given
+- **Timing controls** - Show execution times with configurable precision
 
 ### Target Specifications
 - **Lua Version**: 5.1 (compatible with LuaJIT)
-- **Dependencies**: Minimal - prefer pure Lua implementation
+- **Dependencies**: Minimal core + optional threading backends
 - **No built-in tasks** - Pure task runner, no magic commands
 - **No task overloading** - One task per name
 - **No multi-scripting support** - Pure Lua functions only
 - **Optional argument validation** - Validate when specified, ignore otherwise
 - **No automatic task discovery** - Explicit task definitions only
+- **Buffer-based display** - Store entire output in buffer for proper tree rendering
 
-## Project Structure
+## Architecture Roadmap
+
+```mermaid
+graph LR
+    A[Core Foundation] --> B[Task System]
+    B --> C[Display Engine]
+    C --> D[Execution Backend Choice]
+    
+    D --> E[Pueue Backend Path]
+    D --> F[Native Threading Path]
+    
+    E --> G[Pueue Integration]
+    G --> H[Process Management]
+    
+    F --> I[Lua Lanes Backend]
+    F --> J[Love2D Channels Backend]
+    
+    H --> K[Polish & Features]
+    I --> K
+    J --> K
+    
+    K --> L[Production Ready]
+    
+    subgraph "Phase 1: Foundation"
+        A
+        B
+        C
+    end
+    
+    subgraph "Phase 2: Backend Choice"
+        D
+        E
+        F
+    end
+    
+    subgraph "Phase 3A: Process Path"
+        G
+        H
+    end
+    
+    subgraph "Phase 3B: Threading Path"
+        I
+        J
+    end
+    
+    subgraph "Phase 4: Completion"
+        K
+        L
+    end
+```
+
+## Project Structure (Updated)
 
 ```
 luatask/
 ├── src/
 │   ├── main.tl              # Entry point & CLI parsing
-│   ├── parser.tl            # Task file parser
-│   ├── runner.tl            # Cooperative task execution engine
-│   ├── logger.tl            # Logging system with colors
-│   ├── display.tl           # Tree display with Catppuccin colors
+│   ├── parser.tl            # Task file parser with error bubbling
+│   ├── display/
+│   │   ├── buffer.tl        # Output buffer management for true tree display
+│   │   ├── tree.tl          # True tree structure (not fake lists)
+│   │   └── renderer.tl      # Catppuccin rendering with line clearing
+│   ├── execution/
+│   │   ├── runner.tl        # Base execution interface
+│   │   ├── pueue.tl         # Pueue backend implementation
+│   │   ├── lanes.tl         # Lua Lanes threading backend
+│   │   └── love2d.tl        # Love2D channels backend
+│   ├── libs/
+│   │   └── luash.tl         # Built-in shell command library
+│   ├── logger.tl            # Logging system with buffer integration
 │   ├── args.tl              # Just-like argument parsing utilities
 │   ├── colors.tl            # Catppuccin Mocha color palette
-│   ├── result.tl            # Result enum (SUCCESS/FAIL)
+│   ├── result.tl            # Result handling (optional returns)
+│   ├── timing.tl            # Execution timing with configurable precision
 │   └── types.tl             # Core type definitions
 ├── examples/
 │   └── taskfile.lua         # Example task file with all features
 ├── tests/
 │   ├── test_parser.tl       # Parser tests
-│   ├── test_runner.tl       # Runner tests
-│   ├── test_args.tl         # Argument parsing tests
-│   └── test_display.tl      # Display tests
+│   ├── test_execution.tl    # Execution backend tests
+│   ├── test_display.tl      # Display and buffer tests
+│   └── test_args.tl         # Argument parsing tests
 ├── teal-config.lua          # Teal compiler configuration
 ├── Makefile                 # Build automation
 └── README.md                # Project documentation
 ```
 
-## Core Components
+## Core Components (Updated)
 
-### 1. Result System (result.tl)
+### 1. Result System (result.tl) - FIXED
 
-**Purpose**: Type-safe result handling for task execution
+**Purpose**: Optional return handling with error bubbling
 
 ```lua
-local Result = {
-    SUCCESS = "SUCCESS",
-    FAIL = "FAIL"
-}
+-- Tasks can:
+-- 1. Return nothing (success by default)
+-- 2. Return values (success with data)
+-- 3. Use error() or assert() to fail explicitly
+
+local function run_task(task_fn, ...)
+    local success, result = pcall(task_fn, ...)
+    if not success then
+        return false, result  -- error message
+    end
+    return true, result  -- success, optional return values
+end
 ```
 
-**Features**:
-- Enum-based results instead of string literals
-- Multiple return values supported
-- Results captured via pcall for error safety
-
-### 2. Task File Format
+### 2. Task File Format (Updated)
 
 **File**: `taskfile.lua` (user-defined)
 
 **Structure**:
 ```lua
 local tasks = {}
-local Result = require('luatask.result')
 
-tasks.task_name = {
-    description = "Task description with [arg1] [arg2='default']",
-    group = "optional_group_name",           -- Optional grouping
-    dependencies = {"dep1", {"dep2", "arg"}}, -- String or {name, args...}
-    arguments = {                            -- Optional validation
-        arg1 = {required = true, type = "string"},
-        arg2 = {required = false, default = "value", type = "string"}
-    },
-    run = function(arg1, arg2, ...)
-        log.info("Task executing...")
-        return Result.SUCCESS, additional_values...
+-- Default task (runs when no task specified)
+tasks.default = "build"  -- or function
+
+-- Simplified structure with index support
+tasks[1] = {  -- Alternative to tasks.clean = 
+    name = "clean",
+    description = "Clean build artifacts",
+    group = "build",
+    run = function()
+        luash.rm("-rf", "build/")
+        -- No return needed - success by default
+    end
+}
+
+tasks.build = {
+    description = "Build project [target] [mode='release']",
+    group = "build",
+    dependencies = {"clean"},
+    run = function(target, mode)
+        target = target or "x86_64"
+        mode = mode or "release"
+        
+        luash.silent(true)  -- Silent mode
+        local result = luash.run("make", target, mode)
+        if not result.success then
+            error("Build failed: " .. result.error)
+        end
+        
+        return result.artifacts, result.build_time  -- Return values
+    end
+}
+
+tasks.deploy = {
+    description = "Deploy to environment [env='staging']",
+    group = "deploy",
+    dependencies = {{"build", "x86_64", "release"}},  -- With args
+    run = function(env)
+        env = env or "staging"
+        assert(env == "staging" or env == "production", "Invalid environment")
+        
+        -- Task logic here
+        return deployment_id
     end
 }
 
 return tasks
 ```
 
-**Key Features**:
-- **Arguments**: Just-like positional arguments with defaults
-- **Dependencies**: Can specify arguments for dependency tasks
-- **Validation**: Optional type checking and required argument validation
-- **Multiple returns**: Tasks can return additional data beyond result enum
-- **Grouping**: Optional group field for organizing tasks
-- **Logging**: Global `log` object available in task functions
+### 3. Display System (display/) - MAJOR REWRITE
 
-### 3. Type System (types.tl)
-
-**Core Types**:
-```teal
-local record ArgumentSpec
-    required: boolean
-    type: string
-    default: string
-end
-
-local record Task
-    description: string
-    group: string  -- optional
-    dependencies: {string | {string}}
-    arguments: {string: ArgumentSpec}  -- optional
-    run: function(...): string, ...
-end
-
-local record TaskResult
-    success: boolean  -- pcall success
-    result: string    -- Result.SUCCESS or Result.FAIL
-    values: {any}     -- additional return values
-    error: string     -- error message if pcall failed
-end
-
-local record TaskExecution
-    name: string
-    args: {string}
-    status: string  -- "pending", "running", "success", "fail", "error"
-    dependencies: {TaskCall}
-    coroutine: thread
-    start_time: number
-    end_time: number
-    task_result: TaskResult
-end
-```
-
-### 4. CLI Interface
-
-**Basic Usage**:
-```bash
-luatask                          # List available tasks
-luatask clean                    # Run clean task
-luatask build x86_64 debug       # Run build with arguments
-luatask deploy staging           # Run deploy with argument
-```
-
-**Multiple Tasks**:
-```bash
-luatask clean build test         # Run in sequence
-luatask "build x86_64 debug" test # Quoted for complex arguments
-```
-
-**Options**:
-```bash
-luatask --list                   # Show grouped task list with dependencies
-luatask --parallel clean build test    # Enable cooperative parallelism
-lutatask --jobs 3 --parallel task1 task2 task3  # Limit concurrent tasks
-luatask --log-level debug build        # Set log level (debug/info/warn/error)
-luatask --all-logs build               # Show all logs vs last only
-luatask --file custom.lua build       # Use custom task file
-lutatask --tree build                  # Show dependency tree
-lulatask --dry-run deploy production  # Show execution plan
-lutatask --no-color build             # Disable colors
-lutatask --color build                # Force enable colors (default)
-```
-
-### 5. Argument System (args.tl)
-
-**Just-like Parsing**:
-- `luatask build x86_64 debug` → `build("x86_64", "debug")`
-- `lutatask test unit integration` → `test("unit", "integration")`
-- Support for variadic arguments: `function(...)`
-- Default values: `mode = mode or "release"`
-- the args description should be generated and print when --list
-
-**Validation** (when `arguments` table exists):
-```lua
-arguments = {
-    target = {required = true, type = "string"},
-    mode = {required = false, default = "release", type = "string"}
-}
-```
-
-**Features**:
-- Optional validation - only validate if `arguments` table present
-- Type checking for provided arguments
-- Required argument validation
-- Default value application
-
-### 6. Cooperative Parallelism (runner.tl)
-
-**Implementation**: Coroutine-based cooperative scheduling
-
-**Features**:
-- Dependency-aware task scheduling
-- Configurable job limits (`--jobs N`)
-- Independent tasks run concurrently
-- Dependent tasks wait for prerequisites
-- pcall wrapper for error safety
-
-**Execution Flow**:
-1. Parse dependencies and build execution graph
-2. Schedule tasks with satisfied dependencies
-3. Run tasks in coroutines with cooperative yielding
-4. Update dependency status as tasks complete
-5. Continue until all tasks finished
-
-### 7. Logging System (logger.tl)
-
-**Log Levels**:
-- `DEBUG` (0): Detailed debugging information
-- `INFO` (1): General information (default)
-- `WARN` (2): Warning messages
-- `ERROR` (3): Error messages only
-
-**Features**:
-- Per-task message storage
-- Two display modes:
-  - `--all-logs`: Show all messages for each task
-  - Default: Show only last message per task
-- Colored output based on log level
-- Global `log` object available in task files
-
-**Usage in Tasks**:
-```lua
-run = function(target)
-    log.info("Building " .. target)
-    log.debug("Processing source files...")
-    log.warn("Deprecated feature used")
-    log.error("Build failed!")
-    return Result.SUCCESS
-end
-```
-
-### 8. Display System (display.tl)
-
-**Tree Display Features**:
-- Hierarchical task execution visualization
+**True Tree Structure**:
+- Not fake lists - actual hierarchical dependency trees
+- Buffer-based rendering for proper line management
 - Real-time status updates during execution
-- Colored status indicators (✓ ✗ ⚠ ⟳ ○)
-- Execution timing display
-- Task result details (additional return values)
-- Log message integration
-- Catppuccin Mocha color scheme
+- Proper line clearing for corner drawing
 
-**Task List Display**:
-- Grouped by task group
-- Shows dependencies with arguments
-- Colored task names and descriptions
-- Bold headers for groups
+**Buffer Management** (`buffer.tl`):
+```lua
+local DisplayBuffer = {
+    lines = {},     -- Array of line content
+    tree_pos = {},  -- Tree position data for each line
+    dirty = {},     -- Lines that need redrawing
+}
 
-### 9. Color System (colors.tl)
+function DisplayBuffer:update_line(line_num, content, tree_data)
+    self.lines[line_num] = content
+    self.tree_pos[line_num] = tree_data
+    self.dirty[line_num] = true
+end
 
-**Catppuccin Mocha Palette**:
-- **Task names**: Lavender (bold)
-- **Success indicators**: Green (bold)
-- **Error indicators**: Red (bold)
-- **Group headers**: Mauve (bold)
-- **Dependencies**: Subtext (dim)
-- **Timing info**: Overlay (subtle)
-- **Tree symbols**: Surface (structural)
-- **Log levels**:
-  - INFO: Blue
-  - WARN: Yellow (bold)
-  - ERROR: Red (bold)
-  - DEBUG: Overlay (dim)
+function DisplayBuffer:render()
+    -- Clear dirty lines and redraw
+    for line_num in pairs(self.dirty) do
+        -- Move cursor, clear line, draw content
+    end
+    self.dirty = {}
+end
+```
 
-**Color Control**:
-- Default: Colors enabled
-- `--no-color`: Disable all colors
-- `--color`: Force enable colors
-- Automatic detection of terminal capabilities
+### 4. List Output Format - RESTRUCTURED
 
-## Implementation Phases
-
-### Phase 1: Core Framework
-**Goal**: Basic task execution with result system
-
-**Components**:
-- [ ] `result.tl` - Result enum definition
-- [ ] `types.tl` - Core type definitions
-- [ ] `parser.tl` - Basic task file parsing
-- [ ] `main.tl` - CLI entry point and basic argument parsing
-- [ ] `runner.tl` - Sequential task execution with pcall
-- [ ] Basic success/failure handling
-
-**Deliverable**: Can run simple tasks with SUCCESS/FAIL results
-
-### Phase 2: Arguments & Validation
-**Goal**: Just-like argument support with optional validation
-
-**Components**:
-- [ ] `args.tl` - Argument parsing utilities
-- [ ] Enhanced `parser.tl` - Parse task arguments and validation specs
-- [ ] Enhanced `runner.tl` - Pass arguments to tasks
-- [ ] Dependency resolution with arguments
-- [ ] Argument validation system
-
-**Deliverable**: Tasks can accept arguments with optional type validation
-
-### Phase 3: Logging & Display
-**Goal**: Colored tree display with logging
-
-**Components**:
-- [ ] `colors.tl` - Catppuccin Mocha color palette
-- [ ] `logger.tl` - Leveled logging system with colors
-- [ ] `display.tl` - Tree visualization with colors
-- [ ] Enhanced CLI options for display control
-- [ ] Task grouping and list display
-
-**Deliverable**: Beautiful colored output with tree structure
-
-### Phase 4: Cooperative Parallelism
-**Goal**: Concurrent execution of independent tasks
-
-**Components**:
-- [ ] Enhanced `runner.tl` - Coroutine-based parallel execution
-- [ ] Dependency graph analysis
-- [ ] Job scheduling and limiting
-- [ ] Enhanced `display.tl` - Real-time parallel status updates
-
-**Deliverable**: Tasks run in parallel when dependencies allow
-
-### Phase 5: Polish & Testing
-**Goal**: Production-ready with comprehensive testing
-
-**Components**:
-- [ ] Comprehensive test suite
-- [ ] Error handling improvements
-- [ ] Performance optimization
-- [ ] Documentation and examples
-- [ ] Edge case handling
-
-**Deliverable**: Stable, well-tested task runner
-
-## Example Outputs
-
-### Task List (`luatask --list`)
+**New Format**:
 ```
 Available tasks:
 
 build:
-  clean - Clean build artifacts
-  build [depends: clean] - Build project [target] [mode='release']
+  clean: - Clean build artifacts
+  build [target] [mode='release']: clean - Build project for target
 
 deploy:
-  deploy_staging [depends: build(x86_64, release), test] - Deploy to staging
-  deploy_production [depends: deploy_staging] - Deploy to production
+  deploy [env='staging']: build(x86_64, release) - Deploy to environment
 
 testing:
-  test [depends: build] - Run tests [pattern...]
+  test [pattern...]: build - Run tests with optional pattern filter
 
 Other tasks:
-  check_deps - Check system dependencies
+  check_deps: - Check system dependencies
 ```
 
-### Execution Tree (`luatask deploy_production`)
-```
-Execution tree:
+### 5. Execution Backends (execution/)
 
-├── clean ✓ (0.1s)
-├── build x86_64 release ✓ (2.3s)
-│   ├─ INFO: Building x86_64 in release mode...
-│   └─ Result: SUCCESS, 1623456789, 2
-├── test ✓ (1.8s)
-│   ├─ INFO: Running tests...
-│   └─ Result: SUCCESS, 42
-├── deploy_staging ✓ (0.5s)
-│   ├─ INFO: Deploying to staging...
-│   └─ Result: SUCCESS, deploy-1623456790
-└── deploy_production ✓ (0.3s)
-    ├─ INFO: Deploying to production...
-    └─ Result: SUCCESS
-
-Total time: 4.9s
+**Base Interface** (`runner.tl`):
+```lua
+local record ExecutionBackend
+    name: string
+    start_task: function(TaskExecution): boolean
+    check_status: function(TaskExecution): string  -- "running", "success", "fail"
+    get_output: function(TaskExecution): string
+    cleanup: function()
+end
 ```
 
-## Technical Considerations
+#### Path A: Pueue Backend (`pueue.tl`)
+- Uses pueue daemon for process management
+- No threading needed, just coroutines for polling
+- Better isolation and process control
+- Can survive luatask crashes
 
-### Lua 5.1 Compatibility
-- No `#` length operator on tables (use `table.getn()` or manual counting)
-- No `table.pack`/`unpack` (implement manually if needed)
-- No bitwise operators
-- Use `loadstring()` instead of `load()`
-- `module()` function available
+```lua
+local PueueBackend = {
+    name = "pueue"
+}
 
-### Error Handling Strategy
-- All task execution wrapped in `pcall`
-- Graceful handling of circular dependencies
-- Validation of task file syntax and structure
-- Clear error messages with context
-- Recovery from individual task failures
+function PueueBackend:start_task(task_exec)
+    local cmd = string.format("luatask-runner %s %s", 
+        task_exec.name, table.concat(task_exec.args, " "))
+    local pueue_id = luash.capture("pueue add " .. cmd)
+    task_exec.backend_id = pueue_id
+    return true
+end
+
+function PueueBackend:check_status(task_exec)
+    local status = luash.capture("pueue status " .. task_exec.backend_id)
+    -- Parse pueue output and return status
+end
+```
+
+#### Path B1: Lua Lanes Backend (`lanes.tl`)
+- True threading with shared state
+- Good for CPU-bound tasks
+- Proper parallel execution
+
+```lua
+local LanesBackend = {
+    name = "lanes"
+}
+
+function LanesBackend:start_task(task_exec)
+    local lanes = require "lanes"
+    local linda = lanes.linda()
+    
+    local thread = lanes.gen("*", function()
+        -- Run task in separate thread
+        -- Communicate via linda
+    end)()
+    
+    task_exec.thread = thread
+    task_exec.linda = linda
+    return true
+end
+```
+
+#### Path B2: Love2D Channels Backend (`love2d.tl`)
+- Uses Love2D's channel system
+- Great for async I/O
+- Modern Lua threading approach
+
+```lua
+local Love2DBackend = {
+    name = "love2d"
+}
+
+function Love2DBackend:start_task(task_exec)
+    local love = require "love"
+    local channel = love.thread.newChannel()
+    local thread = love.thread.newThread("task_runner.lua")
+    
+    thread:start(channel, task_exec.name, task_exec.args)
+    task_exec.thread = thread
+    task_exec.channel = channel
+    return true
+end
+```
+
+### 6. Built-in Shell Library (libs/luash.tl)
+
+**Features**:
+- Silent mode for commands
+- Proper error handling
+- Cross-platform compatibility
+
+```lua
+local luash = {}
+local silent_mode = false
+
+function luash.silent(enabled)
+    silent_mode = enabled
+end
+
+function luash.run(cmd, ...)
+    local full_cmd = cmd .. " " .. table.concat({...}, " ")
+    if not silent_mode then
+        log.info("Running: " .. full_cmd)
+    end
+    
+    local handle = io.popen(full_cmd .. " 2>&1")
+    local output = handle:read("*a")
+    local success = handle:close()
+    
+    return {
+        success = success,
+        output = output,
+        error = success and nil or output
+    }
+end
+
+function luash.capture(cmd)
+    local result = luash.run(cmd)
+    if not result.success then
+        error("Command failed: " .. cmd .. "\n" .. result.error)
+    end
+    return result.output:gsub("\n$", "")  -- Trim trailing newline
+end
+
+-- Convenience functions
+function luash.rm(...)
+    return luash.run("rm", ...)
+end
+
+function luash.mkdir(...)
+    return luash.run("mkdir", ...)
+end
+```
+
+### 7. Timing System (timing.tl)
+
+**Features**:
+- Default: Show times > 1s
+- `--timings`: Show all times in ms
+- Configurable precision
+
+```lua
+local timing = {}
+
+function timing.should_show(duration, show_all)
+    if show_all then return true end
+    return duration >= 1.0  -- 1 second threshold
+end
+
+function timing.format(duration, show_ms)
+    if show_ms or duration < 1.0 then
+        return string.format("%.0fms", duration * 1000)
+    else
+        return string.format("%.1fs", duration)
+    end
+end
+```
+
+### 8. CLI Interface (Updated)
+
+**Enhanced Options**:
+```bash
+luatask                          # Run default task (if defined)
+luatask --list                   # Show grouped task list
+luatask --timings build          # Show all times in ms
+luatask --backend pueue build    # Use specific backend
+luatask --backend lanes build    # Use Lua Lanes backend
+luatask --backend love2d build   # Use Love2D channels backend
+luatask --silent build           # Enable luash silent mode globally
+luatask --tree build             # Show execution tree (real tree, not fake)
+```
+
+## Implementation Phases (Updated Roadmap)
+
+### Phase 1: Foundation Fixes ✅ → 🔄
+**Status**: Core structure exists, needs fixes
+
+**Tasks**:
+- [x] Basic task structure
+- [ ] Fix fake tree structure → real tree
+- [ ] Implement error bubbling for missing tasks
+- [ ] Add buffer-based display system
+- [ ] Fix last result not showing
+- [ ] Implement optional return handling
+
+### Phase 2: Enhanced Task System ⏳
+**Status**: In progress
+
+**Tasks**:
+- [ ] Add default task support
+- [ ] Implement luash built-in library
+- [ ] Add timing system with --timings flag
+- [ ] Support index-based task definitions
+- [ ] Restructure list output format
+
+### Phase 3A: Pueue Backend Path 🆕
+**Status**: New implementation
+
+**Tasks**:
+- [ ] Implement pueue backend interface
+- [ ] Add process management via pueue
+- [ ] Integrate with display buffer system
+- [ ] Add real-time status polling
+- [ ] Test isolation and crash recovery
+
+### Phase 3B: Native Threading Paths 🆕
+**Status**: New implementation
+
+**Tasks**:
+- [ ] Implement Lua Lanes backend
+- [ ] Implement Love2D channels backend
+- [ ] Add thread-safe logging
+- [ ] Integrate with display buffer system
+- [ ] Performance testing and optimization
+
+### Phase 4: Polish & Production 🔄
+**Status**: Ongoing improvements
+
+**Tasks**:
+- [ ] Comprehensive testing for all backends
+- [ ] Performance optimization
+- [ ] Documentation updates
+- [ ] Edge case handling
+- [ ] User experience improvements
+
+## Backend Comparison
+
+| Feature | Pueue | Lua Lanes | Love2D |
+|---------|-------|-----------|---------|
+| **Isolation** | ✅ Process | ❌ Threads | ❌ Threads |
+| **Crash Recovery** | ✅ Survives | ❌ Dies with main | ❌ Dies with main |
+| **Setup** | 📦 External | 📦 C Extension | 📦 Love2D Required |
+| **Performance** | 🐌 Process overhead | ⚡ Native threads | ⚡ Fast channels |
+| **Debugging** | ✅ External logs | 🔧 Complex | 🔧 Moderate |
+| **Cross-platform** | ✅ Good | ⚠️ Build complexity | ✅ Excellent |
+
+## Example Outputs (Updated)
+
+### True Tree Execution
+```
+Running: deploy_production
+
+deploy_production
+├─ build(x86_64, release) ⟳
+│  ├─ clean ✓ (0.1s)
+│  └─ build ⟳ (1.2s so far...)
+│     └─ INFO: Compiling main.c...
+├─ test ○ (waiting for build)
+└─ deploy_staging ○ (waiting for test)
+
+Current: Building x86_64 release (73% complete)
+```
+
+### Completed Execution
+```
+deploy_production ✓ (4.9s)
+├─ build(x86_64, release) ✓ (2.3s)
+│  ├─ clean ✓ (0.1s)
+│  └─ build ✓ (2.2s)
+│     ├─ INFO: Building x86_64 in release mode...
+│     └─ Returned: 42 artifacts, build_time=1623456789
+├─ test ✓ (1.8s)
+│  ├─ INFO: Running tests...
+│  └─ Returned: 42 tests passed
+├─ deploy_staging ✓ (0.5s)
+│  └─ Returned: deployment_id=deploy-1623456790
+└─ deploy_production ✓ (0.3s)
+
+Total: 4.9s, Backend: pueue
+```
+
+This refactored plan addresses all the issues in fix.md while providing clear paths for both the pueue backend approach and native threading options.
