@@ -163,21 +163,63 @@ function Parser.load_task_file(file_path: string): Types.TaskRegistry
     -- Parse each task
     local registry: Types.TaskRegistry = {
         tasks = {},
-        file_path = file_path
+        file_path = file_path,
+        default_task = "",
+        indexed_tasks = {} as {number: Types.Task}
     }
 
     local tasks_table = raw_tasks as {string: any}
+
+    -- Check for default task specification
+    if tasks_table.default then
+        if type(tasks_table.default) == "string" then
+            registry.default_task = tasks_table.default as string
+        elseif type(tasks_table.default) == "function" then
+            -- Default task is a function, create a synthetic task
+            registry.tasks["default"] = {
+                description = "Default task",
+                group = "",
+                dependencies = {},
+                arguments = {},
+                run = tasks_table.default as function
+            }
+            registry.default_task = "default"
+        end
+    end
+
     for task_name, raw_task in pairs(tasks_table) do
-        if type(task_name) ~= "string" then
-            error("Task names must be strings")
+        -- Skip special keys like "default"
+        if task_name ~= "default" then
+            -- Handle indexed tasks (tasks[1], tasks[2], etc.)
+            if type(task_name) == "number" then
+                local index = task_name as number
+                if type(raw_task) == "table" then
+                    local task_table = raw_task as {string: any}
+                    if task_table.name and type(task_table.name) == "string" then
+                        local actual_name = task_table.name as string
+                        local parse_success, parsed_task = pcall(parse_task, actual_name, raw_task)
+                        if not parse_success then
+                            error("Failed to parse indexed task " .. tostring(index) .. " ('" .. actual_name .. "'): " .. tostring(parsed_task))
+                        end
+                        registry.tasks[actual_name] = parsed_task as Types.Task
+                        (registry.indexed_tasks as {number: Types.Task})[index] = parsed_task as Types.Task
+                    else
+                        error("Indexed task " .. tostring(index) .. " must have a 'name' field")
+                    end
+                else
+                    error("Indexed task " .. tostring(index) .. " must be a table")
+                end
+            elseif type(task_name) == "string" then
+                -- Handle regular named tasks
+                local parse_success, parsed_task = pcall(parse_task, task_name, raw_task)
+                if not parse_success then
+                    error("Failed to parse task '" .. task_name .. "': " .. tostring(parsed_task))
+                end
+                registry.tasks[task_name] = parsed_task as Types.Task
+            else
+                error("Task names must be strings or numbers, got " .. type(task_name))
+            end
         end
-
-        local parse_success, parsed_task = pcall(parse_task, task_name, raw_task)
-        if not parse_success then
-            error("Failed to parse task '" .. task_name .. "': " .. tostring(parsed_task))
-        end
-
-        registry.tasks[task_name] = parsed_task as Types.Task
     end
 
     return registry
@@ -188,10 +230,27 @@ function Parser.validate_dependencies(registry: Types.TaskRegistry): boolean, st
     for task_name, task in pairs(registry.tasks) do
         for _, dep in ipairs(task.dependencies) do
             if not registry.tasks[dep.name] then
-                return false, "Task '" .. task_name .. "' depends on unknown task '" .. dep.name .. "'"
+                local available_tasks: {string} = {}
+                for name, _ in pairs(registry.tasks) do
+                    table.insert(available_tasks, name)
+                end
+                table.sort(available_tasks)
+
+                local suggestion = ""
+                if #available_tasks > 0 then
+                    suggestion = "\nAvailable tasks: " .. table.concat(available_tasks, ", ")
+                end
+
+                return false, "Task '" .. task_name .. "' depends on unknown task '" .. dep.name .. "'" .. suggestion
             end
         end
     end
+
+    -- Validate default task exists if specified
+    if registry.default_task ~= "" and not registry.tasks[registry.default_task] then
+        return false, "Default task '" .. registry.default_task .. "' does not exist"
+    end
+
     return true, ""
 end
 
@@ -242,21 +301,34 @@ end
 
 -- Parse a task file with full validation
 function Parser.parse_file(file_path: string): Types.TaskRegistry
-    local registry = Parser.load_task_file(file_path)
+    local success, registry = pcall(Parser.load_task_file, file_path)
+    if not success then
+        error("Error loading task file '" .. file_path .. "': " .. tostring(registry))
+    end
 
     -- Validate dependencies exist
-    local deps_valid, deps_err = Parser.validate_dependencies(registry)
+    local deps_valid, deps_err = Parser.validate_dependencies(registry as Types.TaskRegistry)
     if not deps_valid then
-        error(deps_err)
+        error("Dependency validation failed: " .. deps_err)
     end
 
     -- Validate no circular dependencies
-    local cycles_valid, cycles_err = Parser.validate_no_cycles(registry)
+    local cycles_valid, cycles_err = Parser.validate_no_cycles(registry as Types.TaskRegistry)
     if not cycles_valid then
-        error(cycles_err)
+        error("Circular dependency detected: " .. cycles_err)
     end
 
-    return registry
+    -- Ensure we have at least one task
+    local task_count = 0
+    for _, _ in pairs((registry as Types.TaskRegistry).tasks) do
+        task_count = task_count + 1
+    end
+
+    if task_count == 0 then
+        error("Task file contains no valid tasks")
+    end
+
+    return registry as Types.TaskRegistry
 end
 
 return Parser

@@ -37,44 +37,44 @@ graph LR
     A[Core Foundation] --> B[Task System]
     B --> C[Display Engine]
     C --> D[Execution Backend Choice]
-    
+
     D --> E[Pueue Backend Path]
     D --> F[Native Threading Path]
-    
+
     E --> G[Pueue Integration]
     G --> H[Process Management]
-    
+
     F --> I[Lua Lanes Backend]
     F --> J[Love2D Channels Backend]
-    
+
     H --> K[Polish & Features]
     I --> K
     J --> K
-    
+
     K --> L[Production Ready]
-    
+
     subgraph "Phase 1: Foundation"
         A
         B
         C
     end
-    
+
     subgraph "Phase 2: Backend Choice"
         D
         E
         F
     end
-    
+
     subgraph "Phase 3A: Process Path"
         G
         H
     end
-    
+
     subgraph "Phase 3B: Threading Path"
         I
         J
     end
-    
+
     subgraph "Phase 4: Completion"
         K
         L
@@ -150,7 +150,7 @@ local tasks = {}
 tasks.default = "build"  -- or function
 
 -- Simplified structure with index support
-tasks[1] = {  -- Alternative to tasks.clean = 
+tasks[1] = {  -- Alternative to tasks.clean =
     name = "clean",
     description = "Clean build artifacts",
     group = "build",
@@ -167,13 +167,13 @@ tasks.build = {
     run = function(target, mode)
         target = target or "x86_64"
         mode = mode or "release"
-        
+
         luash.silent(true)  -- Silent mode
         local result = luash.run("make", target, mode)
         if not result.success then
             error("Build failed: " .. result.error)
         end
-        
+
         return result.artifacts, result.build_time  -- Return values
     end
 }
@@ -185,7 +185,7 @@ tasks.deploy = {
     run = function(env)
         env = env or "staging"
         assert(env == "staging" or env == "production", "Invalid environment")
-        
+
         -- Task logic here
         return deployment_id
     end
@@ -270,7 +270,7 @@ local PueueBackend = {
 }
 
 function PueueBackend:start_task(task_exec)
-    local cmd = string.format("luatask-runner %s %s", 
+    local cmd = string.format("luatask-runner %s %s",
         task_exec.name, table.concat(task_exec.args, " "))
     local pueue_id = luash.capture("pueue add " .. cmd)
     task_exec.backend_id = pueue_id
@@ -296,12 +296,12 @@ local LanesBackend = {
 function LanesBackend:start_task(task_exec)
     local lanes = require "lanes"
     local linda = lanes.linda()
-    
+
     local thread = lanes.gen("*", function()
         -- Run task in separate thread
         -- Communicate via linda
     end)()
-    
+
     task_exec.thread = thread
     task_exec.linda = linda
     return true
@@ -322,7 +322,7 @@ function Love2DBackend:start_task(task_exec)
     local love = require "love"
     local channel = love.thread.newChannel()
     local thread = love.thread.newThread("task_runner.lua")
-    
+
     thread:start(channel, task_exec.name, task_exec.args)
     task_exec.thread = thread
     task_exec.channel = channel
@@ -350,11 +350,11 @@ function luash.run(cmd, ...)
     if not silent_mode then
         log.info("Running: " .. full_cmd)
     end
-    
+
     local handle = io.popen(full_cmd .. " 2>&1")
     local output = handle:read("*a")
     local success = handle:close()
-    
+
     return {
         success = success,
         output = output,
@@ -429,7 +429,7 @@ luatask --tree build             # Show execution tree (real tree, not fake)
 - [ ] Implement error bubbling for missing tasks
 - [ ] Add buffer-based display system
 - [ ] Fix last result not showing
-- [ ] Implement optional return handling
+- [x] Implement optional return handling
 
 ### Phase 2: Enhanced Task System ⏳
 **Status**: In progress

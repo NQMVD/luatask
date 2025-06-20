@@ -20,7 +20,11 @@ local DEFAULT_CONFIG: Types.Config = {
     no_color = false,
     dry_run = false,
     list_tasks = false,
-    show_tree = false
+    show_tree = false,
+    timings = false,
+    silent = false,
+    backend = "sequential",
+    default_task = ""
 }
 
 -- Print usage information
@@ -40,6 +44,9 @@ local function print_usage()
     print("  --last-log          Show only the last log message from each task (default)")
     print("  --tree              Show dependency tree")
     print("  --dry-run           Show execution plan without running")
+    print("  --timings           Show all execution times in ms")
+    print("  --silent            Enable silent mode for commands")
+    print("  --backend BACKEND   Execution backend (sequential/pueue/lanes/love2d)")
     print("  --no-color          Disable colored output")
     print("  --color             Force enable colors")
     print("  --help, -h          Show this help")
@@ -63,7 +70,11 @@ local function parse_args(args: {string}): Types.CliArgs
         no_color = DEFAULT_CONFIG.no_color,
         dry_run = DEFAULT_CONFIG.dry_run,
         list_tasks = DEFAULT_CONFIG.list_tasks,
-        show_tree = DEFAULT_CONFIG.show_tree
+        show_tree = DEFAULT_CONFIG.show_tree,
+        timings = DEFAULT_CONFIG.timings,
+        silent = DEFAULT_CONFIG.silent,
+        backend = DEFAULT_CONFIG.backend,
+        default_task = DEFAULT_CONFIG.default_task
     }
 
     local tasks: {string} = {}
@@ -113,6 +124,20 @@ local function parse_args(args: {string}): Types.CliArgs
             config.show_tree = true
         elseif current_arg == "--dry-run" then
             config.dry_run = true
+        elseif current_arg == "--timings" then
+            config.timings = true
+        elseif current_arg == "--silent" then
+            config.silent = true
+        elseif current_arg == "--backend" then
+            i = i + 1
+            if i > #args then
+                error("--backend requires a backend name (sequential/pueue/lanes/love2d)")
+            end
+            local backend = args[i]
+            if backend ~= "sequential" and backend ~= "pueue" and backend ~= "lanes" and backend ~= "love2d" then
+                error("Invalid backend: " .. backend)
+            end
+            config.backend = backend
         elseif current_arg == "--no-color" then
             config.no_color = true
         elseif current_arg == "--color" then
@@ -170,13 +195,27 @@ global function main(args: {string})
     end
 
     -- Handle list tasks
-    if cli_args.config.list_tasks or #cli_args.tasks == 0 then
+    if cli_args.config.list_tasks then
         list_tasks(registry)
         return
     end
 
-    -- Run tasks
-    local executions = Runner.run_tasks(registry, cli_args.tasks)
+    -- Handle no tasks specified - use default or list
+    if #cli_args.tasks == 0 then
+        if registry.default_task ~= "" then
+            cli_args.tasks = {registry.default_task}
+        else
+            list_tasks(registry)
+            return
+        end
+    end
+
+    -- Run tasks with better error handling
+    local run_success, executions = pcall(Runner.run_tasks, registry, cli_args.tasks)
+    if not run_success then
+        print("Error executing tasks: " .. tostring(executions))
+        os.exit(1)
+    end
 
     -- Display results using the execution tree
     Display.show_execution_tree(executions, cli_args.config.show_all_logs)

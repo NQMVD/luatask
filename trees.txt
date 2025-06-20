@@ -1,0 +1,61 @@
+
+
+
+
+create
+├── bundle
+│  ├── build
+│  │  └── clean
+│  └─ format
+└── minify
+
+
+
+Running: deploy_production
+├── build x86_64 release
+│   ├── ✓ clean
+│   └── ✓ build x86_64 release (DUPED?)
+│       ├─ INFO: Building x86_64 in release mode...
+│       └─ Result: build_timestamp=1623456789, artifacts=2
+├── ✓ test
+│   ├─ INFO: Running tests...
+│   └─ Result: SUCCESS, passed_count=42
+├── ✓ deploy_staging
+│   ├─ INFO: Deploying to staging...
+│   └─ Result: deployment_id=deploy-1623456790
+└── ✓ deploy_production
+    └─ INFO: Deploying to production...
+
+
+
+Running: deploy_production
+├── ✓ build x86_64 release # < this would need redrawing after clean is done
+│   ├── ✓ clean
+│   ├─ INFO: Building x86_64 in release mode...
+│   └─ Result: build_timestamp=1623456789, artifacts=2
+├── ✓ test
+│   ├─ INFO: Running tests...
+│   └─ Result: SUCCESS, passed_count=42
+├── ✓ deploy_staging
+│   ├─ INFO: Deploying to staging...
+│   └─ Result: deployment_id=deploy-1623456790
+└── ✓ deploy_production
+    └─ INFO: Deploying to production...
+
+
+
+Running: deploy_production
+├── build x86_64 release
+│   ├── ✓ clean
+│   ╰── ✓ build x86_64 release (DUPED?)
+│       ├─ INFO: Building x86_64 in release mode...
+│       ╰─ Result: build_timestamp=1623456789, artifacts=2
+├── ✓ test
+│   ├─ INFO: Running tests...
+│   ╰─ Result: SUCCESS, passed_count=42
+├── ✓ deploy_staging
+│   ├─ INFO: Deploying to staging...
+│   ╰─ Result: deployment_id=deploy-1623456790
+╰── ✓ deploy_production
+    ╰─ INFO: Deploying to production...
+

@@ -5,7 +5,11 @@ tests_dir := "tests"
 
 default: clean build format bundle minify create test
 
-@create:
+test:
+  ./lust --list
+  ./lust create # will rebuild itself but that's fine
+
+@create: bundle minify
     lua scripts/create-executable.lua
 
 bundle:
@@ -14,7 +18,7 @@ bundle:
 minify:
     darklua minify {{build_dir}}/luatask.lua {{build_dir}}/luatask-minified.lua
 
-@build:
+@build: clean
     cyan build
 
 @format:
@@ -70,8 +74,6 @@ lint:
 bench:
   hyperfine './lust' -N --warmup 10 --runs 500 --export-markdown bench.md
 
-test:
-  ./lust --list
 
 # Development setup
 setup:

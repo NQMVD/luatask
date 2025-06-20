@@ -1,5 +1,5 @@
--- Task execution engine with dependency resolution
--- Handles sequential task execution with pcall safety
+-- Task execution engine with dependency resolution and tree building
+-- Handles sequential task execution with optional return support
 
 local Types = require('types')
 local Result = require('result')
@@ -37,15 +37,21 @@ local function create_execution(name: string, args: {string}, dependencies: {Typ
             success = false,
             result = Result.FAIL,
             values = {},
-            error = ""
+            error = "",
+            has_explicit_result = false
         },
-        log_messages = {}
+        log_messages = {},
+        depth = 0,
+        is_root = false,
+        backend_id = "",
+        children = {}
     }
 end
 
--- Resolve task dependencies recursively
-local function resolve_dependencies(registry: Types.TaskRegistry, task_name: string,
-                                  task_args: {string}, resolved: {string: boolean}, path: {string}): {Types.TaskExecution}
+-- Build hierarchical dependency tree structure
+local function build_dependency_tree(registry: Types.TaskRegistry, task_name: string,
+                                    task_args: {string}, resolved: {string: boolean},
+                                    path: {string}): Types.TaskExecution
     -- Check for circular dependencies in this execution path
     for _, p in ipairs(path) do
         if p == task_name then
@@ -60,37 +66,47 @@ local function resolve_dependencies(registry: Types.TaskRegistry, task_name: str
     end
     table.insert(new_path, task_name)
 
-    local executions: {Types.TaskExecution} = {}
     local task = registry.tasks[task_name]
-
     if not task then
         error("Task not found: " .. task_name)
     end
 
-    -- Resolve dependencies first
+
+
+    -- Create this task execution
+    local execution = create_execution(task_name, task_args, task.dependencies)
+
+    -- Build dependency tree by resolving dependencies as children
+    local child_executions: {Types.TaskExecution} = {}
     for _, dep in ipairs(task.dependencies) do
-        local dep_key = dep.name .. "(" .. table.concat(dep.args, ",") .. ")"
-
-        -- Skip if already resolved
-        if not resolved[dep_key] then
-            resolved[dep_key] = true
-            local dep_executions = resolve_dependencies(registry, dep.name, dep.args, resolved, new_path)
-
-            -- Add dependency executions
-            for _, exec in ipairs(dep_executions) do
-                table.insert(executions, exec)
-            end
-        end
+        -- Always build the dependency tree, but track if we've seen this execution
+        local dep_execution = build_dependency_tree(registry, dep.name, dep.args, resolved, new_path)
+        table.insert(child_executions, dep_execution)
     end
 
-    -- Add this task execution
-    local execution = create_execution(task_name, task_args, task.dependencies)
-    table.insert(executions, execution)
+    -- Store child executions in a new field for tree structure
+    execution.children = child_executions
 
-    return executions
+    return execution
 end
 
--- Execute a single task with pcall safety
+-- Flatten tree into execution order (depth-first, dependencies first)
+local function flatten_execution_tree(root: Types.TaskExecution, flattened: {Types.TaskExecution},
+                                     visited: {string: boolean})
+    -- Process dependencies first (depth-first)
+    for _, child in ipairs(root.children or {}) do
+        flatten_execution_tree(child, flattened, visited)
+    end
+
+    -- Then process this task
+    local root_key = root.name .. "(" .. table.concat(root.args, ",") .. ")"
+    if not visited[root_key] then
+        visited[root_key] = true
+        table.insert(flattened, root)
+    end
+end
+
+-- Execute a single task with optional return handling
 local function execute_task(registry: Types.TaskRegistry, execution: Types.TaskExecution): Types.TaskResult
     local task = registry.tasks[execution.name]
     if not task then
@@ -98,7 +114,8 @@ local function execute_task(registry: Types.TaskRegistry, execution: Types.TaskE
             success = false,
             result = Result.FAIL,
             values = {},
-            error = "Task not found: " .. execution.name
+            error = "Task not found: " .. execution.name,
+            has_explicit_result = false
         }
     end
 
@@ -139,41 +156,28 @@ local function execute_task(registry: Types.TaskRegistry, execution: Types.TaskE
         end
     end
 
-    -- Execute the task function with pcall
-    local call_results = {pcall(task.run, manual_unpack(processed_args))}
-    local success = call_results[1]
-    local result = call_results[2]
+    -- Execute the task function with optional return handling
+    local task_success, result_value, return_values = Result.run_task(task.run, manual_unpack(processed_args))
 
-    if not success then
+    if not task_success then
         return {
             success = false,
-            result = Result.FAIL,
-            values = {},
-            error = tostring(result) or "Unknown error"
+            result = result_value,
+            values = return_values,
+            error = tostring(return_values[1]) or "Unknown error",
+            has_explicit_result = true
         }
     end
 
-    -- Validate the result
-    if not Result.is_valid(tostring(result)) then
-        return {
-            success = false,
-            result = Result.FAIL,
-            values = {},
-            error = "Task returned invalid result: " .. tostring(result)
-        }
-    end
-
-    -- Collect additional return values
-    local values = {}
-    for i = 3, #call_results do
-        values[i - 2] = call_results[i]
-    end
+    -- Determine if result was explicitly returned
+    local has_explicit = result_value == Result.SUCCESS or result_value == Result.FAIL
 
     return {
         success = true,
-        result = tostring(result),
-        values = values,
-        error = ""
+        result = result_value,
+        values = return_values,
+        error = "",
+        has_explicit_result = has_explicit
     }
 end
 
@@ -200,20 +204,72 @@ function Runner.parse_task_spec(spec: string): string, {string}
     return task_name, args
 end
 
--- Run a list of tasks sequentially
-function Runner.run_tasks(registry: Types.TaskRegistry, task_specs: {string}): {Types.TaskExecution}
-    local all_executions: {Types.TaskExecution} = {}
-    local resolved: {string: boolean} = {}
-
-    -- Parse task specifications and resolve dependencies
-    for _, spec in ipairs(task_specs) do
-        local task_name, args = Runner.parse_task_spec(spec)
-        local executions = resolve_dependencies(registry, task_name, args, resolved, {})
-
-        for _, exec in ipairs(executions) do
-            table.insert(all_executions, exec)
+-- Get or use default task from registry
+function Runner.resolve_task_list(registry: Types.TaskRegistry, task_specs: {string}): {string}
+    if #task_specs == 0 then
+        -- No tasks specified, use default if available
+        if registry.default_task ~= "" then
+            return {registry.default_task}
+        else
+            error("No tasks specified and no default task defined")
         end
     end
+    return task_specs
+end
+
+-- Mark executions with tree hierarchy information for display
+local function mark_tree_hierarchy(execution: Types.TaskExecution, depth: number)
+    execution.depth = depth
+
+    for _, child in ipairs(execution.children or {}) do
+        mark_tree_hierarchy(child, depth + 1)
+    end
+end
+
+-- Run a list of tasks sequentially with true tree structure
+function Runner.run_tasks(registry: Types.TaskRegistry, task_specs: {string}): {Types.TaskExecution}
+    -- Resolve default task if needed
+    local actual_specs = Runner.resolve_task_list(registry, task_specs)
+
+    -- Build tree structures for each requested task
+    local root_trees: {Types.TaskExecution} = {}
+    local resolved: {string: boolean} = {}
+
+    for _, spec in ipairs(actual_specs) do
+        local task_name, args = Runner.parse_task_spec(spec)
+
+        -- Check if task exists before building tree
+        if not registry.tasks[task_name] then
+            local available_tasks: {string} = {}
+            for name, _ in pairs(registry.tasks) do
+                table.insert(available_tasks, name)
+            end
+            table.sort(available_tasks)
+
+            local suggestion = ""
+            if #available_tasks > 0 then
+                suggestion = "\nAvailable tasks: " .. table.concat(available_tasks, ", ")
+            end
+
+            error("Task not found: " .. task_name .. suggestion)
+        end
+
+        -- Build dependency tree for this root task
+        local tree = build_dependency_tree(registry, task_name, args, resolved, {})
+        tree.is_root = true
+        mark_tree_hierarchy(tree, 0)
+        table.insert(root_trees, tree)
+    end
+
+    -- Flatten trees into execution order
+    local all_executions: {Types.TaskExecution} = {}
+    local visited: {string: boolean} = {}
+
+    for _, root in ipairs(root_trees) do
+        flatten_execution_tree(root, all_executions, visited)
+    end
+
+
 
     -- Execute tasks in dependency order
     for _, execution in ipairs(all_executions) do
@@ -243,6 +299,58 @@ function Runner.run_tasks(registry: Types.TaskRegistry, task_specs: {string}): {
         if execution.status == "fail" or execution.status == "error" then
             break
         end
+    end
+
+    -- Store the tree structure by copying children to all matching executions
+    -- and marking root tasks properly
+    for _, root_tree in ipairs(root_trees) do
+        for _, execution in ipairs(all_executions) do
+            if execution.name == root_tree.name and #execution.args == #root_tree.args then
+                -- Check if args match exactly
+                local args_match = true
+                for i, root_arg in ipairs(root_tree.args) do
+                    if execution.args[i] ~= root_arg then
+                        args_match = false
+                        break
+                    end
+                end
+
+                if args_match then
+                    execution.children = root_tree.children
+                    execution.is_root = true
+                    execution.depth = root_tree.depth
+                end
+            end
+        end
+    end
+
+    -- Also copy children structure to all intermediate tasks by walking the tree
+    local function copy_children_recursive(tree_node: Types.TaskExecution)
+        for _, execution in ipairs(all_executions) do
+            if execution.name == tree_node.name and #execution.args == #tree_node.args then
+                local args_match = true
+                for i, tree_arg in ipairs(tree_node.args) do
+                    if execution.args[i] ~= tree_arg then
+                        args_match = false
+                        break
+                    end
+                end
+
+                if args_match then
+                    execution.children = tree_node.children
+                    execution.depth = tree_node.depth
+                end
+            end
+        end
+
+        -- Recursively copy for children
+        for _, child in ipairs(tree_node.children or {}) do
+            copy_children_recursive(child)
+        end
+    end
+
+    for _, root_tree in ipairs(root_trees) do
+        copy_children_recursive(root_tree)
     end
 
     return all_executions

@@ -23,12 +23,13 @@ local record Task
     run: function      -- Task function that returns Result + extras
 end
 
--- Result of task execution (from pcall + task function)
+-- Result of task execution (supports optional returns)
 local record TaskResult
-    success: boolean      -- Whether pcall succeeded
+    success: boolean      -- Whether pcall succeeded (no error() or assert())
     result: string        -- Result.SUCCESS or Result.FAIL from task
     values: {any}         -- Additional return values from task
     error: string         -- Error message if pcall failed
+    has_explicit_result: boolean  -- Whether task explicitly returned a Result value
 end
 
 -- Task execution state tracking
@@ -42,6 +43,10 @@ local record TaskExecution
     end_time: number          -- Execution end timestamp
     task_result: TaskResult   -- Result of task execution
     log_messages: {LogMessage} -- Log messages from this task
+    depth: number             -- Depth in execution tree (0 = root)
+    is_root: boolean          -- Whether this is a root task
+    backend_id: string        -- Backend-specific execution ID
+    children: {TaskExecution} -- Child task executions for tree structure
 end
 
 -- Log message structure
@@ -62,6 +67,10 @@ local record Config
     dry_run: boolean          -- Show execution plan without running
     list_tasks: boolean       -- Just list tasks and exit
     show_tree: boolean        -- Show dependency tree
+    timings: boolean          -- Show all execution times in ms
+    silent: boolean           -- Enable silent mode for luash
+    backend: string           -- Execution backend ("sequential", "pueue", "lanes", "love2d")
+    default_task: string      -- Default task to run when none specified
 end
 
 -- Parsed command line arguments
@@ -74,6 +83,24 @@ end
 local record TaskRegistry
     tasks: {string: Task}     -- Map of task name to task definition
     file_path: string         -- Path to the loaded task file
+    default_task: string      -- Default task name (if specified)
+    indexed_tasks: {number: Task}  -- Tasks defined by index (tasks[1], tasks[2], etc.)
+end
+
+-- Tree node for hierarchical execution display
+local record TreeNode
+    execution: TaskExecution  -- The task execution this node represents
+    children: {TreeNode}      -- Child nodes (dependencies)
+    parent: TreeNode          -- Parent node (nil for root)
+    depth: number             -- Depth in tree (0 = root)
+    is_last_child: boolean    -- Is this the last child of its parent
+end
+
+-- Execution tree structure
+local record ExecutionTree
+    roots: {TreeNode}         -- Root nodes (tasks with no dependents)
+    nodes: {string: TreeNode} -- Map task execution key to node
+    total_nodes: number       -- Total number of nodes
 end
 
 -- Types module exports
@@ -87,6 +114,8 @@ local record Types
     Config: Config
     CliArgs: CliArgs
     TaskRegistry: TaskRegistry
+    TreeNode: TreeNode
+    ExecutionTree: ExecutionTree
 end
 
 return Types
